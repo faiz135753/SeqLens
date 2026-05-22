@@ -124,12 +124,13 @@ Current MVP includes:
 - Naive forecast baseline
 - MAE, RMSE, MAPE, and direction accuracy metrics
 - Run artifact storage under `runs/`
+- Markdown report generation
+- Actual-vs-predicted PNG plots
 - Example config and sample CSV
 - Basic test coverage
 
 Next development milestone:
 
 - Add moving average baseline
-- Add generated Markdown reports
-- Add actual vs predicted plots
 - Add basic LSTM training
+- Add run comparison reports

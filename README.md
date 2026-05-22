@@ -18,6 +18,7 @@ Many beginners can write an LSTM model but struggle to decide what to change whe
 - YAML experiment configuration
 - CLI entry point for quick diagnosis and naive baseline experiments
 - MAE, RMSE, MAPE, and direction accuracy metrics
+- Markdown report and actual-vs-predicted PNG plots
 
 ## Planned Features
 
@@ -57,6 +58,20 @@ Run the first baseline experiment:
 
 ```bash
 seqlens run-baseline configs/basic_lstm.yaml
+```
+
+Each run writes artifacts under `runs/`:
+
+```text
+runs/<timestamp>_naive/
+├── config.yaml
+├── metadata.yaml
+├── metrics.json
+├── validation_predictions.csv
+├── test_predictions.csv
+├── validation_actual_vs_predicted.png
+├── test_actual_vs_predicted.png
+└── report.md
 ```
 
 Python API:

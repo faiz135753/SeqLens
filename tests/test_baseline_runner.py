@@ -22,7 +22,15 @@ def test_run_naive_baseline_writes_artifacts(tmp_path: Path) -> None:
     assert (result.run_dir / "metrics.json").exists()
     assert (result.run_dir / "validation_predictions.csv").exists()
     assert (result.run_dir / "test_predictions.csv").exists()
+    assert (result.run_dir / "validation_actual_vs_predicted.png").exists()
+    assert (result.run_dir / "test_actual_vs_predicted.png").exists()
+    assert (result.run_dir / "report.md").exists()
 
     predictions = pd.read_csv(result.run_dir / "test_predictions.csv")
     assert list(predictions.columns) == ["date", "actual", "predicted", "error"]
     assert len(predictions) > 0
+
+    report = (result.run_dir / "report.md").read_text(encoding="utf-8")
+    assert "# SeqLens Baseline Report" in report
+    assert "Validation Metrics" in report
+    assert "Test Metrics" in report

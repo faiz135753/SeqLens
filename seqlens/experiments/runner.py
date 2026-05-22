@@ -13,6 +13,7 @@ from seqlens.data.splitting import time_based_split
 from seqlens.evaluation.metrics import RegressionMetrics, regression_metrics
 from seqlens.experiments.config import ExperimentConfig
 from seqlens.models.baselines import naive_forecast
+from seqlens.reports import write_actual_vs_predicted_plot, write_baseline_report
 
 
 @dataclass(frozen=True)
@@ -140,18 +141,42 @@ def _write_run_artifacts(
     with (run_dir / "metrics.json").open("w", encoding="utf-8") as file:
         json.dump(metrics, file, indent=2)
 
-    _prediction_frame(
+    validation_prediction_frame = _prediction_frame(
         validation_frame,
         validation_predictions,
         time_col=time_col,
         target_col=target_col,
-    ).to_csv(run_dir / "validation_predictions.csv", index=False)
-    _prediction_frame(
+    )
+    test_prediction_frame = _prediction_frame(
         test_frame,
         test_predictions,
         time_col=time_col,
         target_col=target_col,
-    ).to_csv(run_dir / "test_predictions.csv", index=False)
+    )
+
+    validation_prediction_frame.to_csv(run_dir / "validation_predictions.csv", index=False)
+    test_prediction_frame.to_csv(run_dir / "test_predictions.csv", index=False)
+
+    validation_plot = "validation_actual_vs_predicted.png"
+    test_plot = "test_actual_vs_predicted.png"
+    write_actual_vs_predicted_plot(
+        validation_prediction_frame,
+        path=run_dir / validation_plot,
+        title="Validation Actual vs Predicted",
+    )
+    write_actual_vs_predicted_plot(
+        test_prediction_frame,
+        path=run_dir / test_plot,
+        title="Test Actual vs Predicted",
+    )
+    write_baseline_report(
+        path=run_dir / "report.md",
+        config=config,
+        validation_metrics=validation_metrics,
+        test_metrics=test_metrics,
+        validation_plot=validation_plot,
+        test_plot=test_plot,
+    )
 
 
 def _prediction_frame(
@@ -170,4 +195,3 @@ def _prediction_frame(
     )
     result["error"] = result["actual"] - result["predicted"]
     return result
-
