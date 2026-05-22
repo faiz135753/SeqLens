@@ -16,7 +16,8 @@ Many beginners can write an LSTM model but struggle to decide what to change whe
 - Basic trend and autocorrelation diagnostics
 - LSTM suitability scoring with human-readable reasons
 - YAML experiment configuration
-- CLI entry point for quick diagnosis
+- CLI entry point for quick diagnosis and naive baseline experiments
+- MAE, RMSE, MAPE, and direction accuracy metrics
 
 ## Planned Features
 
@@ -52,6 +53,12 @@ pip install -e ".[diagnostics]"
 seqlens diagnose examples/sample_stock.csv --time date --target close
 ```
 
+Run the first baseline experiment:
+
+```bash
+seqlens run-baseline configs/basic_lstm.yaml
+```
+
 Python API:
 
 ```python
@@ -63,6 +70,17 @@ score = project.score_lstm_suitability()
 
 print(diagnostics.summary())
 print(score.summary())
+```
+
+Baseline experiment:
+
+```python
+from seqlens.experiments import ExperimentConfig, run_naive_baseline
+
+config = ExperimentConfig.from_yaml("configs/basic_lstm.yaml")
+result = run_naive_baseline(config)
+
+print(result.summary())
 ```
 
 ## Design Principle
@@ -82,6 +100,8 @@ seqlens/
 ├── seqlens/
 │   ├── data/
 │   ├── diagnostics/
+│   ├── evaluation/
+│   ├── models/
 │   ├── suitability/
 │   ├── experiments/
 │   └── cli/

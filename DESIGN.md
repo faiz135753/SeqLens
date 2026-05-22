@@ -44,7 +44,8 @@ models
   Planned: naive, moving average, ARIMA, tree-based models, LSTM, GRU.
 
 evaluation
-  Planned: MAE, RMSE, MAPE, sMAPE, direction accuracy, training time.
+  Calculate MAE, RMSE, MAPE, and direction accuracy. Planned: sMAPE and
+  training time.
 
 agent
   Planned: restricted LLM planner that proposes the next config but never runs
@@ -119,13 +120,16 @@ Current MVP includes:
 - Time-series diagnostics
 - LSTM suitability score
 - CLI diagnosis command
+- Time-based train / validation / test splitting
+- Naive forecast baseline
+- MAE, RMSE, MAPE, and direction accuracy metrics
+- Run artifact storage under `runs/`
 - Example config and sample CSV
 - Basic test coverage
 
 Next development milestone:
 
-- Add train / validation / test splitting
-- Add naive forecast baseline
-- Add MAE, RMSE, MAPE metrics
-- Save run artifacts under `runs/`
-
+- Add moving average baseline
+- Add generated Markdown reports
+- Add actual vs predicted plots
+- Add basic LSTM training
