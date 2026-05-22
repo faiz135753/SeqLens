@@ -123,6 +123,7 @@ Current MVP includes:
 - Time-based train / validation / test splitting
 - Naive and moving average baselines
 - Baseline comparison table
+- Markdown baseline comparison report
 - MAE, RMSE, MAPE, and direction accuracy metrics
 - Run artifact storage under `runs/`
 - Markdown report generation
@@ -133,4 +134,4 @@ Current MVP includes:
 Next development milestone:
 
 - Add basic LSTM training
-- Add Markdown comparison reports
+- Add LSTM vs baseline comparison reports

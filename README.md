@@ -92,6 +92,7 @@ Baseline comparison runs also write:
 ```text
 runs/<timestamp>_baseline_comparison/
 ├── comparison.csv
+├── comparison_report.md
 ├── <timestamp>_naive/
 └── <timestamp>_moving_average/
 ```

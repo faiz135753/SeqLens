@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pandas as pd
+
 from seqlens.evaluation.metrics import RegressionMetrics
 from seqlens.experiments.config import ExperimentConfig
 
@@ -24,6 +26,15 @@ def write_baseline_report(
         validation_plot=validation_plot,
         test_plot=test_plot,
     )
+    Path(path).write_text(report, encoding="utf-8")
+
+
+def write_baseline_comparison_report(
+    *,
+    path: str | Path,
+    comparison: pd.DataFrame,
+) -> None:
+    report = _baseline_comparison_report_text(comparison)
     Path(path).write_text(report, encoding="utf-8")
 
 
@@ -83,4 +94,28 @@ def _metrics_table(metrics: RegressionMetrics) -> str:
 | RMSE | {metrics.rmse:.3f} |
 | MAPE | {mape} |
 | Direction Accuracy | {direction_accuracy} |
+"""
+
+
+def _baseline_comparison_report_text(comparison: pd.DataFrame) -> str:
+    best_row = comparison.sort_values("validation_rmse", ascending=True).iloc[0]
+    table = comparison.to_markdown(index=False, floatfmt=".3f")
+    return f"""# SeqLens Baseline Comparison Report
+
+## Best Validation Baseline
+
+| Field | Value |
+|---|---|
+| Model | {best_row["model"]} |
+| Run directory | `{best_row["run_dir"]}` |
+| Validation RMSE | {best_row["validation_rmse"]:.3f} |
+| Validation MAE | {best_row["validation_mae"]:.3f} |
+
+## Comparison Table
+
+{table}
+
+## Interpretation
+
+The best validation baseline is the minimum benchmark that future LSTM or GRU experiments should try to beat. Tune future experiments against validation metrics, then reserve test metrics for final reporting.
 """

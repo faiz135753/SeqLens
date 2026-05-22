@@ -13,7 +13,11 @@ from seqlens.data.splitting import time_based_split
 from seqlens.evaluation.metrics import RegressionMetrics, regression_metrics
 from seqlens.experiments.config import ExperimentConfig
 from seqlens.models.baselines import baseline_forecast
-from seqlens.reports import write_actual_vs_predicted_plot, write_baseline_report
+from seqlens.reports import (
+    write_actual_vs_predicted_plot,
+    write_baseline_comparison_report,
+    write_baseline_report,
+)
 
 
 @dataclass(frozen=True)
@@ -37,11 +41,13 @@ class BaselineComparisonResult:
     output_dir: Path
     runs: list[BaselineRunResult]
     comparison_path: Path
+    report_path: Path
 
     def summary(self) -> str:
         lines = [
             f"Comparison directory: {self.output_dir}",
             f"Comparison table: {self.comparison_path}",
+            f"Comparison report: {self.report_path}",
             "",
             "Runs:",
         ]
@@ -79,13 +85,17 @@ def run_baseline_comparison(
             }
         )
 
+    comparison = pd.DataFrame(rows)
     comparison_path = comparison_dir / "comparison.csv"
-    pd.DataFrame(rows).to_csv(comparison_path, index=False)
+    report_path = comparison_dir / "comparison_report.md"
+    comparison.to_csv(comparison_path, index=False)
+    write_baseline_comparison_report(path=report_path, comparison=comparison)
 
     return BaselineComparisonResult(
         output_dir=comparison_dir,
         runs=runs,
         comparison_path=comparison_path,
+        report_path=report_path,
     )
 
 
