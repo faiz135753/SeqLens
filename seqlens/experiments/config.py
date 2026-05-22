@@ -13,6 +13,7 @@ class ExperimentConfig:
     target_col: str
     prediction_horizon: int = 1
     sequence_length: int = 30
+    moving_average_window: int = 3
     validation_size: float = 0.2
     test_size: float = 0.2
     seed: int = 42
@@ -27,4 +28,3 @@ class ExperimentConfig:
     def to_yaml(self, path: str | Path) -> None:
         with Path(path).open("w", encoding="utf-8") as file:
             yaml.safe_dump(self.__dict__, file, sort_keys=False)
-

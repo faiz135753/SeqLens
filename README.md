@@ -16,7 +16,8 @@ Many beginners can write an LSTM model but struggle to decide what to change whe
 - Basic trend and autocorrelation diagnostics
 - LSTM suitability scoring with human-readable reasons
 - YAML experiment configuration
-- CLI entry point for quick diagnosis and naive baseline experiments
+- CLI entry point for quick diagnosis and baseline experiments
+- Naive and moving average baselines
 - MAE, RMSE, MAPE, and direction accuracy metrics
 - Markdown report and actual-vs-predicted PNG plots
 
@@ -60,10 +61,22 @@ Run the first baseline experiment:
 seqlens run-baseline configs/basic_lstm.yaml
 ```
 
+Run a moving average baseline:
+
+```bash
+seqlens run-baseline configs/basic_lstm.yaml --model moving_average
+```
+
+Compare all supported baselines listed in the config:
+
+```bash
+seqlens compare-baselines configs/basic_lstm.yaml
+```
+
 Each run writes artifacts under `runs/`:
 
 ```text
-runs/<timestamp>_naive/
+runs/<timestamp>_<model>/
 ├── config.yaml
 ├── metadata.yaml
 ├── metrics.json
@@ -72,6 +85,15 @@ runs/<timestamp>_naive/
 ├── validation_actual_vs_predicted.png
 ├── test_actual_vs_predicted.png
 └── report.md
+```
+
+Baseline comparison runs also write:
+
+```text
+runs/<timestamp>_baseline_comparison/
+├── comparison.csv
+├── <timestamp>_naive/
+└── <timestamp>_moving_average/
 ```
 
 Python API:
@@ -90,10 +112,10 @@ print(score.summary())
 Baseline experiment:
 
 ```python
-from seqlens.experiments import ExperimentConfig, run_naive_baseline
+from seqlens.experiments import ExperimentConfig, run_baseline
 
 config = ExperimentConfig.from_yaml("configs/basic_lstm.yaml")
-result = run_naive_baseline(config)
+result = run_baseline(config, model_name="moving_average")
 
 print(result.summary())
 ```

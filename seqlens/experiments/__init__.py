@@ -1,4 +1,17 @@
 from seqlens.experiments.config import ExperimentConfig
-from seqlens.experiments.runner import BaselineRunResult, run_naive_baseline
+from seqlens.experiments.runner import (
+    BaselineComparisonResult,
+    BaselineRunResult,
+    run_baseline,
+    run_baseline_comparison,
+    run_naive_baseline,
+)
 
-__all__ = ["BaselineRunResult", "ExperimentConfig", "run_naive_baseline"]
+__all__ = [
+    "BaselineComparisonResult",
+    "BaselineRunResult",
+    "ExperimentConfig",
+    "run_baseline",
+    "run_baseline_comparison",
+    "run_naive_baseline",
+]

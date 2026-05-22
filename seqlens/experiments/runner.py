@@ -12,7 +12,7 @@ from seqlens.data.loader import load_csv
 from seqlens.data.splitting import time_based_split
 from seqlens.evaluation.metrics import RegressionMetrics, regression_metrics
 from seqlens.experiments.config import ExperimentConfig
-from seqlens.models.baselines import naive_forecast
+from seqlens.models.baselines import baseline_forecast
 from seqlens.reports import write_actual_vs_predicted_plot, write_baseline_report
 
 
@@ -32,9 +32,75 @@ class BaselineRunResult:
         )
 
 
+@dataclass(frozen=True)
+class BaselineComparisonResult:
+    output_dir: Path
+    runs: list[BaselineRunResult]
+    comparison_path: Path
+
+    def summary(self) -> str:
+        lines = [
+            f"Comparison directory: {self.output_dir}",
+            f"Comparison table: {self.comparison_path}",
+            "",
+            "Runs:",
+        ]
+        lines.extend(f"- {run.run_dir.name}" for run in self.runs)
+        return "\n".join(lines)
+
+
+def run_baseline_comparison(
+    config: ExperimentConfig,
+    *,
+    output_dir: str | Path = "runs",
+) -> BaselineComparisonResult:
+    comparison_dir = _create_run_dir(output_dir, model_name="baseline_comparison")
+    baseline_models = [model for model in config.models if model in {"naive", "moving_average"}]
+    if not baseline_models:
+        raise ValueError("No supported baseline models found in config.models.")
+
+    runs: list[BaselineRunResult] = []
+    rows: list[dict[str, float | str | None]] = []
+    for model_name in baseline_models:
+        run = run_baseline(config, model_name=model_name, output_dir=comparison_dir)
+        runs.append(run)
+        rows.append(
+            {
+                "model": model_name,
+                "run_dir": run.run_dir.name,
+                "validation_mae": run.validation_metrics.mae,
+                "validation_rmse": run.validation_metrics.rmse,
+                "validation_mape": run.validation_metrics.mape,
+                "validation_direction_accuracy": run.validation_metrics.direction_accuracy,
+                "test_mae": run.test_metrics.mae,
+                "test_rmse": run.test_metrics.rmse,
+                "test_mape": run.test_metrics.mape,
+                "test_direction_accuracy": run.test_metrics.direction_accuracy,
+            }
+        )
+
+    comparison_path = comparison_dir / "comparison.csv"
+    pd.DataFrame(rows).to_csv(comparison_path, index=False)
+
+    return BaselineComparisonResult(
+        output_dir=comparison_dir,
+        runs=runs,
+        comparison_path=comparison_path,
+    )
+
+
 def run_naive_baseline(
     config: ExperimentConfig,
     *,
+    output_dir: str | Path = "runs",
+) -> BaselineRunResult:
+    return run_baseline(config, model_name="naive", output_dir=output_dir)
+
+
+def run_baseline(
+    config: ExperimentConfig,
+    *,
+    model_name: str,
     output_dir: str | Path = "runs",
 ) -> BaselineRunResult:
     dataset = load_csv(config.data_path, config.time_col, config.target_col)
@@ -44,9 +110,11 @@ def run_naive_baseline(
         test_size=config.test_size,
     )
 
-    validation_predictions = naive_forecast(
+    validation_predictions = baseline_forecast(
+        model_name,
         split.train[config.target_col],
         len(split.validation),
+        moving_average_window=config.moving_average_window,
     )
     validation_previous = _previous_values(split.train, split.validation, config.target_col)
     validation_metrics = regression_metrics(
@@ -59,7 +127,12 @@ def run_naive_baseline(
         [split.train[config.target_col], split.validation[config.target_col]],
         ignore_index=True,
     )
-    test_predictions = naive_forecast(test_history, len(split.test))
+    test_predictions = baseline_forecast(
+        model_name,
+        test_history,
+        len(split.test),
+        moving_average_window=config.moving_average_window,
+    )
     test_previous = _previous_values(
         pd.concat([split.train, split.validation], ignore_index=True),
         split.test,
@@ -71,9 +144,10 @@ def run_naive_baseline(
         previous_actual=test_previous,
     )
 
-    run_dir = _create_run_dir(output_dir, model_name="naive")
+    run_dir = _create_run_dir(output_dir, model_name=model_name)
     _write_run_artifacts(
         run_dir=run_dir,
+        model_name=model_name,
         config=config,
         dataset_shape=dataset.frame.shape,
         validation_frame=split.validation,
@@ -112,6 +186,7 @@ def _create_run_dir(output_dir: str | Path, *, model_name: str) -> Path:
 def _write_run_artifacts(
     *,
     run_dir: Path,
+    model_name: str,
     config: ExperimentConfig,
     dataset_shape: tuple[int, int],
     validation_frame: pd.DataFrame,
@@ -126,7 +201,7 @@ def _write_run_artifacts(
     config.to_yaml(run_dir / "config.yaml")
 
     metadata = {
-        "model": "naive",
+        "model": model_name,
         "dataset_rows": dataset_shape[0],
         "dataset_columns": dataset_shape[1],
         "created_at": datetime.now(UTC).isoformat(),
@@ -171,6 +246,7 @@ def _write_run_artifacts(
     )
     write_baseline_report(
         path=run_dir / "report.md",
+        model_name=model_name,
         config=config,
         validation_metrics=validation_metrics,
         test_metrics=test_metrics,

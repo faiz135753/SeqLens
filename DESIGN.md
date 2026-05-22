@@ -121,7 +121,8 @@ Current MVP includes:
 - LSTM suitability score
 - CLI diagnosis command
 - Time-based train / validation / test splitting
-- Naive forecast baseline
+- Naive and moving average baselines
+- Baseline comparison table
 - MAE, RMSE, MAPE, and direction accuracy metrics
 - Run artifact storage under `runs/`
 - Markdown report generation
@@ -131,6 +132,5 @@ Current MVP includes:
 
 Next development milestone:
 
-- Add moving average baseline
 - Add basic LSTM training
-- Add run comparison reports
+- Add Markdown comparison reports

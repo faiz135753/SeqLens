@@ -9,6 +9,7 @@ from seqlens.experiments.config import ExperimentConfig
 def write_baseline_report(
     *,
     path: str | Path,
+    model_name: str,
     config: ExperimentConfig,
     validation_metrics: RegressionMetrics,
     test_metrics: RegressionMetrics,
@@ -16,6 +17,7 @@ def write_baseline_report(
     test_plot: str,
 ) -> None:
     report = _baseline_report_text(
+        model_name=model_name,
         config=config,
         validation_metrics=validation_metrics,
         test_metrics=test_metrics,
@@ -27,6 +29,7 @@ def write_baseline_report(
 
 def _baseline_report_text(
     *,
+    model_name: str,
     config: ExperimentConfig,
     validation_metrics: RegressionMetrics,
     test_metrics: RegressionMetrics,
@@ -39,11 +42,12 @@ def _baseline_report_text(
 
 | Field | Value |
 |---|---|
-| Model | naive |
+| Model | {model_name} |
 | Data | `{config.data_path}` |
 | Time column | `{config.time_col}` |
 | Target column | `{config.target_col}` |
 | Prediction horizon | {config.prediction_horizon} |
+| Moving average window | {config.moving_average_window} |
 | Validation size | {config.validation_size} |
 | Test size | {config.test_size} |
 | Seed | {config.seed} |
@@ -62,7 +66,7 @@ def _baseline_report_text(
 
 ## Interpretation
 
-The naive baseline predicts future values using the latest observed target value from the available history. It is intentionally simple and should be treated as the minimum benchmark that more complex models, including LSTM, must beat.
+This baseline is intentionally simple and should be treated as an early benchmark that more complex models, including LSTM, must beat.
 
 Use validation metrics when tuning future experiments. Keep test metrics for final reporting so the experiment does not overfit the test split.
 """
@@ -80,4 +84,3 @@ def _metrics_table(metrics: RegressionMetrics) -> str:
 | MAPE | {mape} |
 | Direction Accuracy | {direction_accuracy} |
 """
-

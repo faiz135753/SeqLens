@@ -3,10 +3,11 @@ time_col: date
 target_col: close
 prediction_horizon: 1
 sequence_length: 30
+moving_average_window: 3
 validation_size: 0.2
 test_size: 0.2
 seed: 42
 models:
   - naive
+  - moving_average
   - lstm
-
