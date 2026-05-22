@@ -1,0 +1,12 @@
+data_path: examples/sample_stock.csv
+time_col: date
+target_col: close
+prediction_horizon: 1
+sequence_length: 30
+validation_size: 0.2
+test_size: 0.2
+seed: 42
+models:
+  - naive
+  - lstm
+

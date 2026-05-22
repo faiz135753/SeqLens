@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "seqlens"
+version = "0.1.0"
+description = "A guardrailed research assistant for LSTM time-series diagnostics, model comparison, and reproducible experiment planning."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+  { name = "SeqLens contributors" }
+]
+keywords = ["time-series", "lstm", "forecasting", "research", "llm", "automl"]
+dependencies = [
+  "numpy>=1.24",
+  "pandas>=2.0",
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+diagnostics = [
+  "statsmodels>=0.14",
+]
+app = [
+  "streamlit>=1.35",
+  "plotly>=5.20",
+]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.5",
+]
+
+[project.scripts]
+seqlens = "seqlens.cli.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["seqlens"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
