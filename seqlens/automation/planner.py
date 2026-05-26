@@ -29,6 +29,7 @@ class ExperimentDiagnosis:
 def diagnose_auto_experiment(
     leaderboard: pd.DataFrame,
     distribution: pd.DataFrame,
+    extreme_profile: pd.DataFrame | None = None,
     *,
     min_validation_positive_support: int = 30,
     min_rule_test_recall: float = 0.05,
@@ -157,6 +158,18 @@ def diagnose_auto_experiment(
 
     if _has_sparse_entity_distribution(distribution):
         next_actions.append("Review entity-level event distribution before trusting aggregate metrics.")
+
+    if extreme_profile is not None and not extreme_profile.empty:
+        blocked_extremes = extreme_profile[extreme_profile["promotion_gate"] == "blocked"]
+        caution_extremes = extreme_profile[extreme_profile["promotion_gate"] == "caution"]
+        if not blocked_extremes.empty:
+            next_actions.append(
+                "Keep blocked extreme-event definitions at the support-planning stage."
+            )
+        if not caution_extremes.empty:
+            next_actions.append(
+                "Rank rare-event candidates by recall, miss rate, and false alarm constraints."
+            )
 
     return ExperimentDiagnosis(
         decisions=decisions,

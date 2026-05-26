@@ -5,6 +5,10 @@ from seqlens.automation.factor_planner import (
     recommend_event_factors,
 )
 from seqlens.automation.event_support import event_support_plan
+from seqlens.automation.extreme_events import (
+    ExtremeEventPolicy,
+    assess_extreme_event_layer,
+)
 from seqlens.automation.planner import (
     ExperimentDiagnosis,
     PromotionDecision,
@@ -16,7 +20,9 @@ __all__ = [
     "ExperimentDiagnosis",
     "ExperimentCandidate",
     "FactorRecommendation",
+    "ExtremeEventPolicy",
     "PromotionDecision",
+    "assess_extreme_event_layer",
     "diagnose_auto_experiment",
     "event_support_plan",
     "generate_candidates",

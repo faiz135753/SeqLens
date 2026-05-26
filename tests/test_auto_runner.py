@@ -73,6 +73,7 @@ automation:
     assert result.leaderboard_path.exists()
     assert result.distribution_path.exists()
     assert result.support_plan_path.exists()
+    assert result.extreme_profile_path.exists()
     assert result.diagnosis_path.exists()
     assert result.factor_recommendations_path.exists()
     assert result.recommendations_path.exists()
@@ -84,6 +85,7 @@ automation:
         leaderboard.columns
     )
     assert "threshold_strategy" in leaderboard.columns
+    assert "extreme_rarity_level" in leaderboard.columns
 
     distribution = pd.read_csv(result.distribution_path)
     assert {"split", "entity", "positive_support", "event_rate"}.issubset(
@@ -95,6 +97,12 @@ automation:
     assert {"threshold", "horizon", "support_status"}.issubset(support_plan.columns)
     assert set(support_plan["horizon"]) == {3, 6}
     assert (result.run_dir / "event_support_plan.md").exists()
+
+    extreme_profile = pd.read_csv(result.extreme_profile_path)
+    assert {"rarity_level", "promotion_gate", "imbalance_ratio"}.issubset(
+        extreme_profile.columns
+    )
+    assert (result.run_dir / "extreme_profile.md").exists()
 
     diagnosis = pd.read_csv(result.diagnosis_path)
     assert {"stage", "status", "reason"}.issubset(diagnosis.columns)

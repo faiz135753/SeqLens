@@ -18,6 +18,11 @@ from seqlens.automation.factor_planner import (
     recommend_event_factors,
 )
 from seqlens.automation.event_support import event_support_markdown, event_support_plan
+from seqlens.automation.extreme_events import (
+    ExtremeEventPolicy,
+    assess_extreme_event_layer,
+    extreme_event_markdown,
+)
 from seqlens.data.splitting import time_based_split
 from seqlens.experiments import (
     EventExperimentConfig,
@@ -37,6 +42,7 @@ class AutoExperimentResult:
     leaderboard_path: Path
     distribution_path: Path
     support_plan_path: Path
+    extreme_profile_path: Path
     diagnosis_path: Path
     factor_recommendations_path: Path
     recommendations_path: Path
@@ -50,6 +56,7 @@ class AutoExperimentResult:
             f"Leaderboard: {self.leaderboard_path}\n"
             f"Event distribution: {self.distribution_path}\n"
             f"Event support plan: {self.support_plan_path}\n"
+            f"Extreme event profile: {self.extreme_profile_path}\n"
             f"Experiment diagnosis: {self.diagnosis_path}\n"
             f"Factor recommendations: {self.factor_recommendations_path}\n"
             f"Recommendations: {self.recommendations_path}\n"
@@ -90,6 +97,7 @@ def run_auto_event_experiment(
         key="threshold_strategies",
         fallback=[base_config.threshold_strategy],
     )
+    extreme_policy = ExtremeEventPolicy.from_automation(raw.get("automation", {}))
 
     run_dir = _create_run_dir(output_dir, name="auto_event")
     frame = pd.read_csv(base_config.data_path)
@@ -116,6 +124,12 @@ def run_auto_event_experiment(
         support_plan_markdown,
         encoding="utf-8",
     )
+    extreme_profile = assess_extreme_event_layer(distribution, policy=extreme_policy)
+    extreme_profile_path = run_dir / "extreme_profile.csv"
+    extreme_profile.to_csv(extreme_profile_path, index=False)
+    extreme_profile_markdown = extreme_event_markdown(extreme_profile)
+    (run_dir / "extreme_profile.md").write_text(extreme_profile_markdown, encoding="utf-8")
+    extreme_lookup = _extreme_profile_lookup(extreme_profile)
     factor_recommendations = recommend_event_factors(frame, base_config)
     factor_recommendations_path = run_dir / "factor_recommendations.csv"
     factor_recommendations_to_frame(factor_recommendations).to_csv(
@@ -162,6 +176,7 @@ def run_auto_event_experiment(
                                 model,
                                 strategy,
                                 result,
+                                extreme_lookup.get((float(threshold), int(observation))),
                             )
                         )
                     except Exception as exc:  # noqa: BLE001
@@ -183,13 +198,13 @@ def run_auto_event_experiment(
     if errors:
         pd.DataFrame(errors).to_csv(run_dir / "errors.csv", index=False)
 
-    diagnosis = diagnose_auto_experiment(leaderboard, distribution)
+    diagnosis = diagnose_auto_experiment(leaderboard, distribution, extreme_profile)
     diagnosis_path = run_dir / "experiment_diagnosis.csv"
     diagnosis_to_frame(diagnosis).to_csv(diagnosis_path, index=False)
     diagnosis_md_path = run_dir / "experiment_diagnosis.md"
     diagnosis_md_path.write_text(diagnosis_to_markdown(diagnosis), encoding="utf-8")
 
-    recommendations = _recommendations(leaderboard, errors, distribution, diagnosis)
+    recommendations = _recommendations(leaderboard, errors, distribution, extreme_profile, diagnosis)
     recommendations_path = run_dir / "recommendations.md"
     recommendations_path.write_text(recommendations, encoding="utf-8")
 
@@ -199,6 +214,7 @@ def run_auto_event_experiment(
             leaderboard=leaderboard,
             distribution=distribution,
             support_plan_markdown=support_plan_markdown,
+            extreme_profile_markdown=extreme_profile_markdown,
             diagnosis_markdown=diagnosis_to_markdown(diagnosis),
             factor_recommendations_markdown=factor_recommendations_md,
             errors=errors,
@@ -212,6 +228,7 @@ def run_auto_event_experiment(
         leaderboard_path=leaderboard_path,
         distribution_path=distribution_path,
         support_plan_path=support_plan_path,
+        extreme_profile_path=extreme_profile_path,
         diagnosis_path=diagnosis_path,
         factor_recommendations_path=factor_recommendations_path,
         recommendations_path=recommendations_path,
@@ -254,8 +271,9 @@ def _leaderboard_row(
     model: str,
     threshold_strategy: str,
     result: EventRunResult,
+    extreme_profile: dict | None = None,
 ) -> dict[str, float | int | str | None]:
-    return {
+    row = {
         "candidate": candidate_name,
         "threshold": threshold,
         "observation": observation,
@@ -277,6 +295,31 @@ def _leaderboard_row(
         "test_false_alarm_rate": result.test_metrics.false_alarm_rate,
         "test_miss_rate": result.test_metrics.miss_rate,
         "test_positive_support": result.test_metrics.positive_support,
+    }
+    if extreme_profile is not None:
+        row.update(
+            {
+                "extreme_rarity_level": extreme_profile["rarity_level"],
+                "extreme_promotion_gate": extreme_profile["promotion_gate"],
+                "extreme_event_rate": extreme_profile["event_rate"],
+                "extreme_imbalance_ratio": extreme_profile["imbalance_ratio"],
+                "extreme_min_split_positive_support": extreme_profile[
+                    "min_split_positive_support"
+                ],
+                "extreme_min_entity_positive_support": extreme_profile[
+                    "min_entity_positive_support"
+                ],
+            }
+        )
+    return row
+
+
+def _extreme_profile_lookup(profile: pd.DataFrame) -> dict[tuple[float, int], dict]:
+    if profile.empty:
+        return {}
+    return {
+        (float(row["threshold"]), int(row["observation"])): row.to_dict()
+        for _, row in profile.iterrows()
     }
 
 
@@ -375,6 +418,7 @@ def _recommendations(
     leaderboard: pd.DataFrame,
     errors: list[dict],
     distribution: pd.DataFrame,
+    extreme_profile: pd.DataFrame,
     diagnosis,
 ) -> str:
     lines = ["# Recommendations", ""]
@@ -448,6 +492,32 @@ def _recommendations(
             ]
         )
 
+    if not extreme_profile.empty:
+        blocked = extreme_profile[extreme_profile["promotion_gate"] == "blocked"]
+        caution = extreme_profile[extreme_profile["promotion_gate"] == "caution"]
+        if not blocked.empty or not caution.empty:
+            risk_rows = pd.concat([blocked, caution]).head(10)
+            lines.extend(
+                [
+                    "## Extreme Event Layer",
+                    "",
+                    "- Some event definitions are too sparse for normal auto-experiment promotion.",
+                    "- Treat these as extreme-value experiments and prefer recall/miss-rate gates.",
+                    "",
+                    risk_rows[
+                        [
+                            "threshold",
+                            "observation",
+                            "positive_support",
+                            "event_rate",
+                            "rarity_level",
+                            "promotion_gate",
+                        ]
+                    ].to_markdown(index=False, floatfmt=".4f"),
+                    "",
+                ]
+            )
+
     sparse = distribution[distribution["positive_support"] < 5]
     if not sparse.empty:
         sparse_splits = sparse[["threshold", "observation", "split", "entity"]].head(10)
@@ -484,6 +554,7 @@ def _final_report(
     leaderboard: pd.DataFrame,
     distribution: pd.DataFrame,
     support_plan_markdown: str,
+    extreme_profile_markdown: str,
     diagnosis_markdown: str,
     factor_recommendations_markdown: str,
     errors: list[dict],
@@ -509,6 +580,10 @@ def _final_report(
 ## Event Support Plan
 
 {support_plan_markdown}
+
+## Extreme Event Layer
+
+{extreme_profile_markdown}
 
 ## Experiment Diagnosis
 
