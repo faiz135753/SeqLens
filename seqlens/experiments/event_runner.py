@@ -96,7 +96,7 @@ def run_event_baseline(
     output_dir: str | Path = "runs",
 ) -> EventRunResult:
     frame = pd.read_csv(config.data_path)
-    supervised = _make_supervised_dataset(frame, config)
+    supervised = make_event_supervised_dataset(frame, config)
     split = time_based_split(
         supervised,
         validation_size=config.validation_size,
@@ -198,7 +198,10 @@ def _format_threshold(threshold: float) -> str:
     return str(threshold).replace(".", "p")
 
 
-def _make_supervised_dataset(frame: pd.DataFrame, config: EventExperimentConfig) -> pd.DataFrame:
+def make_event_supervised_dataset(
+    frame: pd.DataFrame,
+    config: EventExperimentConfig,
+) -> pd.DataFrame:
     if config.entity_col and config.entity_col in frame.columns:
         pieces = []
         for entity_value, group in frame.groupby(config.entity_col, sort=False):

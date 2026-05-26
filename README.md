@@ -127,6 +127,8 @@ seqlens auto-run configs/rainfall_extreme_rain.yaml
 `auto-run` expands configured thresholds, observation windows, and models, then writes:
 
 ```text
+event_distribution.csv
+event_distribution.md
 leaderboard.csv
 recommendations.md
 final_report.md

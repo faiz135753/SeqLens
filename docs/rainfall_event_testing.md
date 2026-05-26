@@ -340,6 +340,7 @@ models: [event_majority, lgbm]
 This produced 12 candidate experiments and wrote:
 
 ```text
+event_distribution.csv
 leaderboard.csv
 recommendations.md
 final_report.md
@@ -373,6 +374,48 @@ Auto-run recommendations:
 Important note:
 
 The current auto-runner already supports automated candidate expansion and comparison, but it should still be treated as an experiment screening layer. Its recommendations correctly indicate that the task is not ready for LSTM promotion yet.
+
+## Station-Level Distribution Report
+
+Auto-run now writes:
+
+```text
+event_distribution.csv
+event_distribution.md
+```
+
+The report includes event support by:
+
+```text
+threshold
+observation window
+split
+station
+```
+
+Example issue found in the six-station test:
+
+```text
+Some station-level splits have fewer than 5 positive events.
+```
+
+For the 40 mm / 3h task, validation examples showed sparse stations:
+
+| Threshold | Observation | Split | Station |
+|---:|---:|---|---|
+| 40 | 12 | validation | 467660 |
+| 40 | 12 | validation | 466940 |
+| 40 | 12 | test | 466940 |
+
+For the 80 mm / 3h task, the overall split support is already too small:
+
+| Split | Positive Support |
+|---|---:|
+| Train | 7 |
+| Validation | 11 |
+| Test | 7 |
+
+This confirms that the current data slice should not be promoted to LSTM. The next research step should improve event support and station balance first.
 
 2. Add event-aware baselines.
 

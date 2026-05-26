@@ -63,6 +63,7 @@ automation:
 
     assert result.candidate_count == 2
     assert result.leaderboard_path.exists()
+    assert result.distribution_path.exists()
     assert result.recommendations_path.exists()
     assert result.report_path.exists()
 
@@ -72,3 +73,8 @@ automation:
         leaderboard.columns
     )
 
+    distribution = pd.read_csv(result.distribution_path)
+    assert {"split", "entity", "positive_support", "event_rate"}.issubset(
+        distribution.columns
+    )
+    assert set(distribution["split"]) == {"train", "validation", "test"}

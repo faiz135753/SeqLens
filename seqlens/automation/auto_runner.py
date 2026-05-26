@@ -10,17 +10,20 @@ import yaml
 from seqlens.experiments import (
     EventExperimentConfig,
     EventRunResult,
+    make_event_supervised_dataset,
     run_event_baseline,
     with_event_model,
     with_event_threshold,
     with_observation_window,
 )
+from seqlens.data.splitting import time_based_split
 
 
 @dataclass(frozen=True)
 class AutoExperimentResult:
     run_dir: Path
     leaderboard_path: Path
+    distribution_path: Path
     recommendations_path: Path
     report_path: Path
     candidate_count: int
@@ -30,6 +33,7 @@ class AutoExperimentResult:
             f"Auto experiment directory: {self.run_dir}\n"
             f"Candidates: {self.candidate_count}\n"
             f"Leaderboard: {self.leaderboard_path}\n"
+            f"Event distribution: {self.distribution_path}\n"
             f"Recommendations: {self.recommendations_path}\n"
             f"Final report: {self.report_path}"
         )
@@ -60,6 +64,18 @@ def run_auto_event_experiment(
     )
 
     run_dir = _create_run_dir(output_dir, name="auto_event")
+    frame = pd.read_csv(base_config.data_path)
+    distribution = _event_distribution_report(
+        frame=frame,
+        base_config=base_config,
+        thresholds=thresholds,
+        observation_windows=observation_windows,
+    )
+    distribution_path = run_dir / "event_distribution.csv"
+    distribution.to_csv(distribution_path, index=False)
+    distribution_md_path = run_dir / "event_distribution.md"
+    distribution_md_path.write_text(_event_distribution_markdown(distribution), encoding="utf-8")
+
     rows = []
     errors = []
     for threshold in thresholds:
@@ -99,7 +115,7 @@ def run_auto_event_experiment(
     if errors:
         pd.DataFrame(errors).to_csv(run_dir / "errors.csv", index=False)
 
-    recommendations = _recommendations(leaderboard, errors)
+    recommendations = _recommendations(leaderboard, errors, distribution)
     recommendations_path = run_dir / "recommendations.md"
     recommendations_path.write_text(recommendations, encoding="utf-8")
 
@@ -107,6 +123,7 @@ def run_auto_event_experiment(
     report_path.write_text(
         _final_report(
             leaderboard=leaderboard,
+            distribution=distribution,
             errors=errors,
             recommendations=recommendations,
         ),
@@ -116,6 +133,7 @@ def run_auto_event_experiment(
     return AutoExperimentResult(
         run_dir=run_dir,
         leaderboard_path=leaderboard_path,
+        distribution_path=distribution_path,
         recommendations_path=recommendations_path,
         report_path=report_path,
         candidate_count=len(rows) + len(errors),
@@ -180,7 +198,102 @@ def _leaderboard_row(
     }
 
 
-def _recommendations(leaderboard: pd.DataFrame, errors: list[dict]) -> str:
+def _event_distribution_report(
+    *,
+    frame: pd.DataFrame,
+    base_config: EventExperimentConfig,
+    thresholds: list,
+    observation_windows: list,
+) -> pd.DataFrame:
+    rows = []
+    for threshold in thresholds:
+        if threshold is None:
+            continue
+        for observation in observation_windows:
+            config = with_observation_window(
+                with_event_threshold(base_config, float(threshold)),
+                int(observation),
+            )
+            supervised = make_event_supervised_dataset(frame, config)
+            split = time_based_split(
+                supervised,
+                validation_size=config.validation_size,
+                test_size=config.test_size,
+            )
+            target_col = config.target.output_name
+            for split_name, split_frame in [
+                ("train", split.train),
+                ("validation", split.validation),
+                ("test", split.test),
+            ]:
+                rows.extend(
+                    _distribution_rows(
+                        split_frame,
+                        split_name=split_name,
+                        threshold=float(threshold),
+                        observation=int(observation),
+                        target_col=target_col,
+                        entity_col=config.entity_col,
+                    )
+                )
+    return pd.DataFrame(rows)
+
+
+def _distribution_rows(
+    frame: pd.DataFrame,
+    *,
+    split_name: str,
+    threshold: float,
+    observation: int,
+    target_col: str,
+    entity_col: str | None,
+) -> list[dict[str, float | int | str]]:
+    if entity_col and entity_col in frame.columns:
+        groups = frame.groupby(entity_col, sort=False)
+    else:
+        groups = [("all", frame)]
+
+    rows = []
+    for entity, group in groups:
+        support = int(len(group))
+        positives = int((group[target_col] == 1).sum())
+        rows.append(
+            {
+                "threshold": threshold,
+                "observation": observation,
+                "split": split_name,
+                "entity": str(entity),
+                "support": support,
+                "positive_support": positives,
+                "event_rate": 0.0 if support == 0 else positives / support,
+            }
+        )
+    return rows
+
+
+def _event_distribution_markdown(distribution: pd.DataFrame) -> str:
+    if distribution.empty:
+        table = "No event distribution rows."
+    else:
+        summary = (
+            distribution.groupby(["threshold", "observation", "split"], as_index=False)
+            .agg({"support": "sum", "positive_support": "sum"})
+            .assign(event_rate=lambda frame: frame["positive_support"] / frame["support"])
+        )
+        table = summary.to_markdown(index=False, floatfmt=".4f")
+    return f"""# Event Distribution
+
+## Split Summary
+
+{table}
+"""
+
+
+def _recommendations(
+    leaderboard: pd.DataFrame,
+    errors: list[dict],
+    distribution: pd.DataFrame,
+) -> str:
     lines = ["# Recommendations", ""]
     if leaderboard.empty:
         lines.append("No candidates completed successfully. Inspect `errors.csv`.")
@@ -251,6 +364,21 @@ def _recommendations(leaderboard: pd.DataFrame, errors: list[dict]) -> str:
             ]
         )
 
+    sparse = distribution[distribution["positive_support"] < 5]
+    if not sparse.empty:
+        sparse_splits = sparse[["threshold", "observation", "split", "entity"]].head(10)
+        lines.extend(
+            [
+                "## Station Distribution Issue",
+                "",
+                "- Some station-level splits have fewer than 5 positive events.",
+                "- This can make validation or test recall unstable.",
+                "",
+                sparse_splits.to_markdown(index=False),
+                "",
+            ]
+        )
+
     lines.extend(
         [
             "## Next Experiment Suggestions",
@@ -264,7 +392,12 @@ def _recommendations(leaderboard: pd.DataFrame, errors: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def _final_report(leaderboard: pd.DataFrame, errors: list[dict], recommendations: str) -> str:
+def _final_report(
+    leaderboard: pd.DataFrame,
+    distribution: pd.DataFrame,
+    errors: list[dict],
+    recommendations: str,
+) -> str:
     if leaderboard.empty:
         table = "No successful candidates."
     else:
@@ -278,6 +411,10 @@ def _final_report(leaderboard: pd.DataFrame, errors: list[dict], recommendations
 
 {table}
 
+## Event Distribution Summary
+
+{_event_distribution_markdown(distribution)}
+
 ## Failed Candidates
 
 {len(errors)}
@@ -290,4 +427,3 @@ def _format_value(value: object) -> str:
     if isinstance(value, float) and value == int(value):
         return str(int(value))
     return str(value).replace(".", "p")
-

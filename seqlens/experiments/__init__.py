@@ -2,6 +2,7 @@ from seqlens.experiments.config import ExperimentConfig
 from seqlens.experiments.event_runner import (
     EventExperimentConfig,
     EventRunResult,
+    make_event_supervised_dataset,
     run_event_baseline,
     with_event_model,
     with_event_threshold,
@@ -21,6 +22,7 @@ __all__ = [
     "EventExperimentConfig",
     "EventRunResult",
     "ExperimentConfig",
+    "make_event_supervised_dataset",
     "run_baseline",
     "run_baseline_comparison",
     "run_event_baseline",
