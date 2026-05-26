@@ -173,6 +173,31 @@ def with_event_model(config: EventExperimentConfig, model: str) -> EventExperime
     return replace(config, model=model)
 
 
+def with_event_threshold(config: EventExperimentConfig, threshold: float) -> EventExperimentConfig:
+    return replace(
+        config,
+        target=replace(
+            config.target,
+            threshold=threshold,
+            name=f"{config.target.column}_{config.target.aggregation}_next_"
+            f"{config.target.horizon}_ge_{_format_threshold(threshold)}",
+        ),
+    )
+
+
+def with_observation_window(
+    config: EventExperimentConfig,
+    observation: int,
+) -> EventExperimentConfig:
+    return replace(config, window=replace(config.window, observation=observation))
+
+
+def _format_threshold(threshold: float) -> str:
+    if threshold == int(threshold):
+        return str(int(threshold))
+    return str(threshold).replace(".", "p")
+
+
 def _make_supervised_dataset(frame: pd.DataFrame, config: EventExperimentConfig) -> pd.DataFrame:
     if config.entity_col and config.entity_col in frame.columns:
         pieces = []

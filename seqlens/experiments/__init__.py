@@ -4,6 +4,8 @@ from seqlens.experiments.event_runner import (
     EventRunResult,
     run_event_baseline,
     with_event_model,
+    with_event_threshold,
+    with_observation_window,
 )
 from seqlens.experiments.runner import (
     BaselineComparisonResult,
@@ -24,4 +26,6 @@ __all__ = [
     "run_event_baseline",
     "run_naive_baseline",
     "with_event_model",
+    "with_event_threshold",
+    "with_observation_window",
 ]

@@ -327,6 +327,53 @@ rainfall_lag_24
    leave-one-station-out validation
    ```
 
+## Auto-Run Test
+
+After adding the AutoExperimentRunner MVP, the same dataset was tested with:
+
+```yaml
+thresholds: [40, 60, 80]
+observation_windows: [12, 24]
+models: [event_majority, lgbm]
+```
+
+This produced 12 candidate experiments and wrote:
+
+```text
+leaderboard.csv
+recommendations.md
+final_report.md
+```
+
+Best validation candidate:
+
+```text
+thr40_obs12_lgbm
+```
+
+Metrics:
+
+| Split | Precision | Recall | F1 | False Alarm Rate | Positive Support |
+|---|---:|---:|---:|---:|---:|
+| Validation | 0.050 | 0.500 | 0.091 | 0.038 | 84 |
+| Test | 0.077 | 0.016 | 0.026 | 0.001 | 64 |
+
+Auto-run recommendations:
+
+```text
+- Some candidates have fewer than 30 validation positive events.
+- Expand years, add stations, or lower threshold before promoting to LSTM.
+- At least one LGBM candidate found non-zero test recall.
+- Compare station-level event distribution before considering LSTM.
+- Add threshold strategy modes beyond F1 maximization.
+- Add rainfall-aware baselines such as rolling sum threshold.
+- Add humidity, pressure, wind, and pressure-change factors when available.
+```
+
+Important note:
+
+The current auto-runner already supports automated candidate expansion and comparison, but it should still be treated as an experiment screening layer. Its recommendations correctly indicate that the task is not ready for LSTM promotion yet.
+
 2. Add event-aware baselines.
 
    Useful baselines:

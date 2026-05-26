@@ -11,6 +11,7 @@ from seqlens.experiments import (
     run_event_baseline,
     with_event_model,
 )
+from seqlens.automation import run_auto_event_experiment
 from seqlens.models import SUPPORTED_BASELINES
 
 
@@ -58,6 +59,10 @@ def main() -> None:
     )
     run_event_parser.add_argument("--output-dir", default="runs", help="Directory for artifacts")
 
+    auto_run_parser = subcommands.add_parser("auto-run", help="Run an automated event experiment")
+    auto_run_parser.add_argument("config", help="Path to the automated experiment YAML config")
+    auto_run_parser.add_argument("--output-dir", default="runs", help="Directory for artifacts")
+
     args = parser.parse_args()
 
     if args.command == "diagnose":
@@ -77,4 +82,7 @@ def main() -> None:
         if args.model:
             config = with_event_model(config, args.model)
         result = run_event_baseline(config, output_dir=args.output_dir)
+        print(result.summary())
+    elif args.command == "auto-run":
+        result = run_auto_event_experiment(args.config, output_dir=args.output_dir)
         print(result.summary())

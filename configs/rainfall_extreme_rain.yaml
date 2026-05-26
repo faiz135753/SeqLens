@@ -39,3 +39,7 @@ evaluation:
   primary_metric: recall
   secondary_metrics: [precision, f1, pr_auc]
 
+automation:
+  thresholds: [40, 60, 80]
+  observation_windows: [12, 24]
+  models: [event_majority, lgbm]

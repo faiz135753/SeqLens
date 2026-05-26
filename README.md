@@ -118,6 +118,28 @@ pip install -e ".[lgbm]"
 seqlens run-event configs/rainfall_extreme_rain.yaml --model lgbm
 ```
 
+Run an automated event experiment:
+
+```bash
+seqlens auto-run configs/rainfall_extreme_rain.yaml
+```
+
+`auto-run` expands configured thresholds, observation windows, and models, then writes:
+
+```text
+leaderboard.csv
+recommendations.md
+final_report.md
+```
+
+For rainfall warning experiments, the current automation path is:
+
+```text
+event_majority -> lgbm -> leaderboard -> recommendations
+```
+
+LSTM should only be promoted after LGBM shows stable validation and test signal.
+
 The first external rainfall test notes are in:
 
 ```text
