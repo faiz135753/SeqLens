@@ -4,7 +4,7 @@ import pandas as pd
 
 
 SUPPORTED_BASELINES = ("naive", "moving_average")
-SUPPORTED_EVENT_BASELINES = ("event_majority",)
+SUPPORTED_EVENT_BASELINES = ("event_majority", "event_naive", "recent_window_threshold")
 
 
 def naive_forecast(

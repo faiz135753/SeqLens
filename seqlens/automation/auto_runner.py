@@ -364,7 +364,7 @@ def _recommendations(
                 "",
                 "- LGBM failed to recall events on the test split.",
                 "- Do not promote this task to LSTM yet.",
-                "- Add meteorological factors and station-aware validation first.",
+                "- Add stronger domain factors and entity-aware validation first.",
                 "",
             ]
         )
@@ -408,10 +408,10 @@ def _recommendations(
         [
             "## Next Experiment Suggestions",
             "",
-            "- Add station-level event distribution artifacts.",
-                "- Compare threshold strategy modes against operational warning goals.",
-            "- Add rainfall-aware baselines such as rolling sum threshold.",
-            "- Add humidity, pressure, wind, and pressure-change factors when available.",
+            "- Compare threshold strategy modes against operational goals.",
+            "- Compare generic event-aware baselines before promoting to LGBM or LSTM.",
+            "- Add domain-specific external factors when available.",
+            "- Check entity-level event distribution before trusting aggregate metrics.",
         ]
     )
     return "\n".join(lines)

@@ -71,6 +71,70 @@ evaluation:
     assert (result.run_dir / "test_predictions.csv").exists()
 
 
+def test_run_recent_window_threshold_event_baseline(tmp_path: Path) -> None:
+    rows = []
+    for hour in range(48):
+        rows.append(
+            {
+                "timestamp": pd.Timestamp("2024-01-01") + pd.Timedelta(hours=hour),
+                "asset_id": "sensor-a",
+                "signal": 10 if hour % 12 in {6, 7, 8} else 0,
+            }
+        )
+    data_path = tmp_path / "signals.csv"
+    pd.DataFrame(rows).to_csv(data_path, index=False)
+
+    config_path = tmp_path / "signals.yaml"
+    config_path.write_text(
+        f"""
+domain: generic_signal
+task_type: classification
+data:
+  path: {data_path}
+  time_col: timestamp
+  entity_col: asset_id
+target:
+  type: future_window_event
+  column: signal
+  horizon: 3
+  aggregation: sum
+  threshold: 20
+  name: signal_event_next_3h
+window:
+  observation_windows: [6]
+  horizons: [3]
+  step: 1
+factors:
+  lag:
+    columns: [signal]
+    periods: [1, 2, 3]
+  rolling:
+    columns: [signal]
+    windows: [3]
+    stats: [sum]
+models:
+  baselines: [recent_window_threshold]
+event_baseline:
+  type: recent_window_threshold
+  column: signal
+  window: 3
+  aggregation: sum
+  threshold: 20
+evaluation:
+  primary_metric: recall
+""",
+        encoding="utf-8",
+    )
+
+    config = EventExperimentConfig.from_yaml(config_path)
+    result = run_event_baseline(config, output_dir=tmp_path)
+    predictions = pd.read_csv(result.run_dir / "test_predictions.csv")
+
+    assert result.supervised_rows > 0
+    assert result.event_rate > 0
+    assert set(predictions["predicted"].unique()).issubset({0, 1})
+
+
 def test_run_lgbm_event_model_when_lightgbm_is_available(tmp_path: Path) -> None:
     try:
         __import__("lightgbm")

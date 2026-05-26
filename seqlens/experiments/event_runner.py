@@ -35,6 +35,10 @@ class EventExperimentConfig:
     threshold_strategy: str = "maximize_f1"
     precision_floor: float = 0.05
     false_alarm_cap: float = 0.05
+    event_baseline_column: str | None = None
+    event_baseline_window: int | None = None
+    event_baseline_aggregation: str = "sum"
+    event_baseline_threshold: float | None = None
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "EventExperimentConfig":
@@ -47,6 +51,7 @@ class EventExperimentConfig:
         window = raw["window"]
         evaluation = raw.get("evaluation", {})
         threshold_strategy = evaluation.get("threshold_strategy", {})
+        event_baseline = raw.get("event_baseline", {})
         observation_windows = window.get("observation_windows") or [window["observation"]]
         horizons = window.get("horizons") or [target["horizon"]]
 
@@ -72,6 +77,10 @@ class EventExperimentConfig:
             threshold_strategy=threshold_strategy.get("name", "maximize_f1"),
             precision_floor=float(threshold_strategy.get("precision_floor", 0.05)),
             false_alarm_cap=float(threshold_strategy.get("false_alarm_cap", 0.05)),
+            event_baseline_column=event_baseline.get("column", target["column"]),
+            event_baseline_window=event_baseline.get("window"),
+            event_baseline_aggregation=event_baseline.get("aggregation", "sum"),
+            event_baseline_threshold=event_baseline.get("threshold", target.get("threshold")),
         )
 
 
@@ -143,6 +152,9 @@ def run_event_baseline(
         test_probabilities = predict_lgbm_event_probability(final_model, split.test)
         test_predictions = (test_probabilities >= threshold).astype("Int64")
         feature_importance = lgbm_feature_importance(final_model)
+    elif config.model == "recent_window_threshold":
+        validation_predictions = _recent_window_threshold_predict(split.validation, config)
+        test_predictions = _recent_window_threshold_predict(split.test, config)
     else:
         validation_predictions = _event_baseline_predict(
             config.model,
@@ -203,6 +215,7 @@ def with_event_threshold(config: EventExperimentConfig, threshold: float) -> Eve
             name=f"{config.target.column}_{config.target.aggregation}_next_"
             f"{config.target.horizon}_ge_{_format_threshold(threshold)}",
         ),
+        event_baseline_threshold=threshold,
     )
 
 
@@ -253,6 +266,30 @@ def _event_baseline_predict(model: str, history: pd.Series, horizon: int) -> pd.
     if model in {"event_majority", "event_naive"}:
         return event_majority_forecast(history, horizon)
     raise ValueError(f"Unsupported event baseline model: {model}")
+
+
+def _recent_window_threshold_predict(
+    frame: pd.DataFrame,
+    config: EventExperimentConfig,
+) -> pd.Series:
+    if config.event_baseline_column is None:
+        raise ValueError("recent_window_threshold requires event_baseline.column.")
+    if config.event_baseline_window is None:
+        raise ValueError("recent_window_threshold requires event_baseline.window.")
+    if config.event_baseline_threshold is None:
+        raise ValueError("recent_window_threshold requires event_baseline.threshold.")
+
+    factor_col = (
+        f"{config.event_baseline_column}_roll_{config.event_baseline_window}_"
+        f"{config.event_baseline_aggregation}"
+    )
+    if factor_col not in frame.columns:
+        raise ValueError(
+            f"recent_window_threshold requires factor column `{factor_col}`. "
+            "Add the matching rolling factor to config."
+        )
+    predictions = frame[factor_col] >= config.event_baseline_threshold
+    return predictions.astype("Int64").reset_index(drop=True)
 
 
 def _feature_columns(
@@ -467,7 +504,7 @@ def _event_report_text(
 
 ## Interpretation
 
-This event baseline predicts the majority event class observed in the training history. If it achieves high accuracy but zero recall, the event is likely rare and accuracy is not a useful primary metric.
+Event baselines are sanity checks before promoting a task to learned models. If a baseline achieves high accuracy but zero recall, the event is likely rare and accuracy is not a useful primary metric.
 """
 
 

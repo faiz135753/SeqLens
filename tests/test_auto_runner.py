@@ -48,13 +48,19 @@ factors:
     stats: [sum, max]
   calendar: [hour]
 models:
-  baselines: [event_majority]
+  baselines: [event_majority, recent_window_threshold]
+event_baseline:
+  type: recent_window_threshold
+  column: rainfall
+  window: 3
+  aggregation: sum
+  threshold: 80
 evaluation:
   primary_metric: recall
 automation:
   thresholds: [60, 80]
   observation_windows: [6]
-  models: [event_majority]
+  models: [event_majority, recent_window_threshold]
   threshold_strategies: [maximize_f1, maximize_recall]
 """,
         encoding="utf-8",
@@ -62,14 +68,14 @@ automation:
 
     result = run_auto_event_experiment(config_path, output_dir=tmp_path)
 
-    assert result.candidate_count == 2
+    assert result.candidate_count == 4
     assert result.leaderboard_path.exists()
     assert result.distribution_path.exists()
     assert result.recommendations_path.exists()
     assert result.report_path.exists()
 
     leaderboard = pd.read_csv(result.leaderboard_path)
-    assert len(leaderboard) == 2
+    assert len(leaderboard) == 4
     assert {"candidate", "threshold", "model", "validation_recall"}.issubset(
         leaderboard.columns
     )

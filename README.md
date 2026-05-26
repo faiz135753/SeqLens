@@ -53,6 +53,9 @@ SeqLens standardizes this process with:
   - stock direction prediction
 - Experiment candidate generator
 - Naive and moving average baselines
+- Event-aware baselines:
+  - event majority
+  - recent window threshold
 - Baseline comparison reports
 - Markdown reports and PNG plots
 
@@ -137,8 +140,13 @@ final_report.md
 For rainfall warning experiments, the current automation path is:
 
 ```text
-event_majority -> lgbm -> leaderboard -> recommendations
+event_majority -> recent_window_threshold -> lgbm -> leaderboard -> recommendations
 ```
+
+`recent_window_threshold` is a generic event-aware baseline. It compares a rolling
+factor, such as a recent sum, max, mean, or volatility proxy, against a threshold.
+The same pattern can represent rainfall accumulation, price volatility, sensor
+spikes, traffic load, or energy demand events.
 
 LSTM should only be promoted after LGBM shows stable validation and test signal.
 

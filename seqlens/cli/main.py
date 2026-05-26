@@ -12,7 +12,7 @@ from seqlens.experiments import (
     with_event_model,
 )
 from seqlens.automation import run_auto_event_experiment
-from seqlens.models import SUPPORTED_BASELINES
+from seqlens.models import SUPPORTED_BASELINES, SUPPORTED_EVENT_BASELINES
 
 
 def main() -> None:
@@ -54,7 +54,7 @@ def main() -> None:
     run_event_parser.add_argument(
         "--model",
         default=None,
-        choices=["event_majority", "event_naive", "lgbm"],
+        choices=[*SUPPORTED_EVENT_BASELINES, "lgbm"],
         help="Override the event model from config",
     )
     run_event_parser.add_argument("--output-dir", default="runs", help="Directory for artifacts")

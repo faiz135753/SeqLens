@@ -31,9 +31,16 @@ factors:
   calendar: [hour, month, season]
 
 models:
-  baselines: [event_naive]
+  baselines: [event_majority, recent_window_threshold]
   tabular: [lgbm]
   sequence: [lstm]
+
+event_baseline:
+  type: recent_window_threshold
+  column: rainfall
+  window: 3
+  aggregation: sum
+  threshold: 40
 
 evaluation:
   primary_metric: recall
@@ -46,7 +53,7 @@ evaluation:
 automation:
   thresholds: [40, 60, 80]
   observation_windows: [12, 24]
-  models: [event_majority, lgbm]
+  models: [event_majority, recent_window_threshold, lgbm]
   threshold_strategies:
     - maximize_f1
     - maximize_recall

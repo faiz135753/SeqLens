@@ -1,6 +1,8 @@
 # Rainfall Event Testing Notes
 
 This note records the first external multi-station rainfall event test for SeqLens.
+Rainfall is treated as a validation scenario for the cross-domain event workflow,
+not as the core product boundary.
 
 ## Data Source
 
@@ -171,6 +173,76 @@ Test:
 5. External station files are not perfectly uniform.
 
    Some station/year combinations may be missing, so the data preparation layer needs availability checks.
+
+6. The framework should keep rainfall-specific logic outside the core runner.
+
+   Generic event concepts should be expressed through target definitions, rolling
+   factors, threshold strategies, and entity-level validation artifacts.
+
+## Generic Event-Aware Baseline
+
+SeqLens now includes:
+
+```text
+recent_window_threshold
+```
+
+This baseline predicts an event when a configured rolling factor crosses a
+threshold. For rainfall, this can be recent cumulative rainfall. In other
+domains, the same baseline can represent recent return volatility, machine
+sensor spikes, traffic load, or energy demand peaks.
+
+Example:
+
+```yaml
+event_baseline:
+  type: recent_window_threshold
+  column: rainfall
+  window: 3
+  aggregation: sum
+  threshold: 40
+```
+
+The matching rolling factor must exist in `factors.rolling`, for example:
+
+```yaml
+factors:
+  rolling:
+    columns: [rainfall]
+    windows: [3]
+    stats: [sum]
+```
+
+When automation tests several target thresholds, the baseline threshold follows
+the active target threshold so candidates remain comparable.
+
+### Auto-Run Check
+
+The generic baseline was tested in an automated run with:
+
+```text
+thresholds: 40, 60
+observation window: 12
+models: event_majority, recent_window_threshold, lgbm
+```
+
+Key results:
+
+| Threshold | Model | Validation Recall | Validation F1 | Test Recall | Test F1 |
+|---:|---|---:|---:|---:|---:|
+| 40 | event_majority | 0.000 | 0.000 | 0.000 | 0.000 |
+| 40 | recent_window_threshold | 0.143 | 0.143 | 0.078 | 0.078 |
+| 40 | lgbm, maximize_f1 | 0.500 | 0.091 | 0.016 | 0.026 |
+| 40 | lgbm, maximize_recall | 0.512 | 0.073 | 0.172 | 0.025 |
+| 60 | event_majority | 0.000 | 0.000 | 0.000 | 0.000 |
+| 60 | recent_window_threshold | 0.000 | 0.000 | 0.031 | 0.031 |
+| 60 | lgbm, maximize_f1 | 0.280 | 0.006 | 0.312 | 0.007 |
+
+Interpretation:
+
+- `recent_window_threshold` is a useful bridge between majority baselines and learned models.
+- LGBM can increase recall, but sparse events make precision and false alarms unstable.
+- The workflow should continue to compare simple rules, LGBM, and only later LSTM.
 
 ## Recommendations
 
