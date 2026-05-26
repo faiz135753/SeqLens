@@ -178,6 +178,155 @@ Test:
 
    It should use the generated lag, rolling, and calendar factors to test whether the factors contain learnable signal.
 
+   Status: implemented as an optional model via:
+
+   ```bash
+   pip install -e ".[lgbm]"
+   seqlens run-event configs/rainfall_extreme_rain.yaml --model lgbm
+   ```
+
+## LGBM Classifier Test
+
+After adding the optional LGBM plugin, the same six-station dataset was tested with:
+
+```bash
+seqlens run-event <threshold_config> --model lgbm
+```
+
+The model uses generated lag, rolling, and calendar factors. The decision threshold is selected on validation data by scanning thresholds from `0.05` to `0.95` and maximizing F1.
+
+### 40 mm Threshold
+
+Validation:
+
+| Metric | Value |
+|---|---:|
+| Accuracy | 0.966 |
+| Precision | 0.057 |
+| Recall | 0.476 |
+| F1 | 0.102 |
+| False alarm rate | 0.032 |
+| Miss rate | 0.524 |
+| Positive support | 84 |
+
+Test:
+
+| Metric | Value |
+|---|---:|
+| Accuracy | 0.996 |
+| Precision | 0.077 |
+| Recall | 0.016 |
+| F1 | 0.026 |
+| False alarm rate | 0.001 |
+| Miss rate | 0.984 |
+| Positive support | 64 |
+
+Top factors:
+
+```text
+hour
+rainfall_roll_24_std
+month
+rainfall_roll_12_std
+rainfall_roll_24_sum
+rainfall_roll_6_std
+```
+
+### 80 mm Threshold
+
+Validation:
+
+| Metric | Value |
+|---|---:|
+| Accuracy | 0.950 |
+| Precision | 0.000 |
+| Recall | 0.000 |
+| F1 | 0.000 |
+| False alarm rate | 0.049 |
+| Miss rate | 1.000 |
+| Positive support | 11 |
+
+Test:
+
+| Metric | Value |
+|---|---:|
+| Accuracy | 0.850 |
+| Precision | 0.000 |
+| Recall | 0.000 |
+| F1 | 0.000 |
+| False alarm rate | 0.150 |
+| Miss rate | 1.000 |
+| Positive support | 7 |
+
+Top factors:
+
+```text
+hour
+rainfall_roll_24_std
+month
+rainfall_roll_12_std
+rainfall_roll_24_sum
+rainfall_lag_24
+```
+
+## Updated Problems Found
+
+1. LGBM can learn some validation signal at the 40 mm threshold, but the signal does not generalize to the test split.
+
+2. The 80 mm threshold has too few positive samples in 2022-2023 for a stable supervised experiment.
+
+3. Calendar factors such as `hour` and `month` dominate feature importance. This may be legitimate seasonality, but it may also indicate that rainfall-only factors are too weak.
+
+4. Validation threshold tuning by F1 is not enough. The model needs threshold strategies that optimize warning objectives, such as high recall with bounded false alarm rate.
+
+5. The current split is global time-based across stations. Station-level distribution shifts should be reported before model comparison.
+
+## Updated Recommendations
+
+1. Expand the dataset period.
+
+   Use at least 5-10 years for 80 mm / 3h extreme rainfall experiments.
+
+2. Add station-level event distribution reports.
+
+   Report positive support by station and split before training.
+
+3. Add threshold search modes.
+
+   Support:
+
+   ```text
+   maximize_f1
+   maximize_recall
+   maximize_recall_with_precision_floor
+   minimize_miss_rate_with_false_alarm_cap
+   ```
+
+4. Add stronger rainfall event baselines.
+
+   Useful baselines:
+
+   ```text
+   rolling_3h_sum_threshold
+   rolling_6h_sum_threshold
+   monthly_hourly_climatology
+   ```
+
+5. Add meteorological factors.
+
+   Rainfall-only factors are likely insufficient. Add pressure, humidity, wind, and pressure-change features where station data supports them.
+
+6. Add station-aware modeling.
+
+   Options:
+
+   ```text
+   station one-hot encoding
+   station-level models
+   region preset
+   leave-one-station-out validation
+   ```
+
 2. Add event-aware baselines.
 
    Useful baselines:
@@ -214,4 +363,3 @@ Test:
 6. Add data availability checks.
 
    Before running experiments, report missing station/year files and skipped stations.
-

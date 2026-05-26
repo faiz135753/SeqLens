@@ -111,6 +111,13 @@ python scripts/prepare_rainfall_sample.py
 seqlens run-event configs/rainfall_extreme_rain.yaml
 ```
 
+Run an LGBM event model:
+
+```bash
+pip install -e ".[lgbm]"
+seqlens run-event configs/rainfall_extreme_rain.yaml --model lgbm
+```
+
 The first external rainfall test notes are in:
 
 ```text

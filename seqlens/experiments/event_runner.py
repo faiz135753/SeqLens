@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -11,6 +11,11 @@ import yaml
 from seqlens.data.splitting import time_based_split
 from seqlens.evaluation import ClassificationMetrics, classification_metrics
 from seqlens.factors import FactorSpec
+from seqlens.models.lgbm import (
+    lgbm_feature_importance,
+    predict_lgbm_event_probability,
+    train_lgbm_classifier,
+)
 from seqlens.models import event_majority_forecast
 from seqlens.targets import TargetSpec
 from seqlens.windows import WindowSpec, make_supervised_frame
@@ -69,12 +74,15 @@ class EventRunResult:
     test_metrics: ClassificationMetrics
     supervised_rows: int
     event_rate: float
+    threshold: float | None = None
 
     def summary(self) -> str:
+        threshold = "n/a" if self.threshold is None else f"{self.threshold:.3f}"
         return (
             f"Run directory: {self.run_dir}\n"
             f"Supervised rows: {self.supervised_rows}\n"
             f"Overall event rate: {self.event_rate:.3f}\n\n"
+            f"Decision threshold: {threshold}\n\n"
             "Validation metrics\n"
             f"{self.validation_metrics.summary()}\n\n"
             "Test metrics\n"
@@ -96,13 +104,39 @@ def run_event_baseline(
     )
 
     target_col = config.target.output_name
-    validation_predictions = _event_baseline_predict(
-        config.model,
-        split.train[target_col],
-        len(split.validation),
-    )
-    test_history = pd.concat([split.train[target_col], split.validation[target_col]])
-    test_predictions = _event_baseline_predict(config.model, test_history, len(split.test))
+    feature_importance = None
+    validation_probabilities = None
+    test_probabilities = None
+    threshold = None
+
+    if config.model == "lgbm":
+        feature_columns = _feature_columns(supervised, config=config, target_col=target_col)
+        model = train_lgbm_classifier(
+            split.train,
+            target_col=target_col,
+            feature_columns=feature_columns,
+        )
+        validation_probabilities = predict_lgbm_event_probability(model, split.validation)
+        threshold = _choose_threshold(split.validation[target_col], validation_probabilities)
+        validation_predictions = (validation_probabilities >= threshold).astype("Int64")
+
+        train_validation = pd.concat([split.train, split.validation], ignore_index=True)
+        final_model = train_lgbm_classifier(
+            train_validation,
+            target_col=target_col,
+            feature_columns=feature_columns,
+        )
+        test_probabilities = predict_lgbm_event_probability(final_model, split.test)
+        test_predictions = (test_probabilities >= threshold).astype("Int64")
+        feature_importance = lgbm_feature_importance(final_model)
+    else:
+        validation_predictions = _event_baseline_predict(
+            config.model,
+            split.train[target_col],
+            len(split.validation),
+        )
+        test_history = pd.concat([split.train[target_col], split.validation[target_col]])
+        test_predictions = _event_baseline_predict(config.model, test_history, len(split.test))
 
     validation_metrics = classification_metrics(split.validation[target_col], validation_predictions)
     test_metrics = classification_metrics(split.test[target_col], test_predictions)
@@ -114,10 +148,14 @@ def run_event_baseline(
         supervised=supervised,
         validation_frame=split.validation,
         validation_predictions=validation_predictions,
+        validation_probabilities=validation_probabilities,
         validation_metrics=validation_metrics,
         test_frame=split.test,
         test_predictions=test_predictions,
+        test_probabilities=test_probabilities,
         test_metrics=test_metrics,
+        feature_importance=feature_importance,
+        threshold=threshold,
         target_col=target_col,
     )
 
@@ -127,7 +165,12 @@ def run_event_baseline(
         test_metrics=test_metrics,
         supervised_rows=len(supervised),
         event_rate=float((supervised[target_col] == 1).mean()),
+        threshold=threshold,
     )
+
+
+def with_event_model(config: EventExperimentConfig, model: str) -> EventExperimentConfig:
+    return replace(config, model=model)
 
 
 def _make_supervised_dataset(frame: pd.DataFrame, config: EventExperimentConfig) -> pd.DataFrame:
@@ -161,6 +204,36 @@ def _event_baseline_predict(model: str, history: pd.Series, horizon: int) -> pd.
     if model in {"event_majority", "event_naive"}:
         return event_majority_forecast(history, horizon)
     raise ValueError(f"Unsupported event baseline model: {model}")
+
+
+def _feature_columns(
+    supervised: pd.DataFrame,
+    *,
+    config: EventExperimentConfig,
+    target_col: str,
+) -> list[str]:
+    excluded = {config.time_col, target_col}
+    if config.entity_col:
+        excluded.add(config.entity_col)
+    feature_columns = [column for column in supervised.columns if column not in excluded]
+    if not feature_columns:
+        raise ValueError("No feature columns available for LGBM.")
+    return feature_columns
+
+
+def _choose_threshold(actual: pd.Series, probabilities: pd.Series) -> float:
+    best_threshold = 0.5
+    best_f1 = -1.0
+    best_recall = -1.0
+    for index in range(5, 96, 5):
+        threshold = index / 100
+        predicted = (probabilities >= threshold).astype(int)
+        metrics = classification_metrics(actual, predicted)
+        if (metrics.f1, metrics.recall) > (best_f1, best_recall):
+            best_threshold = threshold
+            best_f1 = metrics.f1
+            best_recall = metrics.recall
+    return best_threshold
 
 
 def _factor_spec_from_yaml(raw: dict) -> FactorSpec:
@@ -203,10 +276,14 @@ def _write_event_artifacts(
     supervised: pd.DataFrame,
     validation_frame: pd.DataFrame,
     validation_predictions: pd.Series,
+    validation_probabilities: pd.Series | None,
     validation_metrics: ClassificationMetrics,
     test_frame: pd.DataFrame,
     test_predictions: pd.Series,
+    test_probabilities: pd.Series | None,
     test_metrics: ClassificationMetrics,
+    feature_importance: pd.DataFrame | None,
+    threshold: float | None,
     target_col: str,
 ) -> None:
     metadata = {
@@ -215,6 +292,7 @@ def _write_event_artifacts(
         "target": target_col,
         "supervised_rows": len(supervised),
         "event_rate": float((supervised[target_col] == 1).mean()),
+        "decision_threshold": threshold,
         "created_at": datetime.now(UTC).isoformat(),
     }
     with (run_dir / "metadata.yaml").open("w", encoding="utf-8") as file:
@@ -228,14 +306,26 @@ def _write_event_artifacts(
         json.dump(metrics, file, indent=2)
 
     supervised.head(5000).to_csv(run_dir / "supervised_preview.csv", index=False)
-    _event_predictions(validation_frame, validation_predictions, target_col).to_csv(
+    _event_predictions(
+        validation_frame,
+        validation_predictions,
+        target_col,
+        probabilities=validation_probabilities,
+    ).to_csv(
         run_dir / "validation_predictions.csv",
         index=False,
     )
-    _event_predictions(test_frame, test_predictions, target_col).to_csv(
+    _event_predictions(
+        test_frame,
+        test_predictions,
+        target_col,
+        probabilities=test_probabilities,
+    ).to_csv(
         run_dir / "test_predictions.csv",
         index=False,
     )
+    if feature_importance is not None:
+        feature_importance.to_csv(run_dir / "feature_importance.csv", index=False)
     (run_dir / "report.md").write_text(
         _event_report_text(
             metadata=metadata,
@@ -250,14 +340,19 @@ def _event_predictions(
     frame: pd.DataFrame,
     predictions: pd.Series,
     target_col: str,
+    *,
+    probabilities: pd.Series | None = None,
 ) -> pd.DataFrame:
-    return pd.DataFrame(
+    result = pd.DataFrame(
         {
             "time": frame.iloc[:, 0].reset_index(drop=True),
             "actual": frame[target_col].reset_index(drop=True).astype(int),
             "predicted": predictions.reset_index(drop=True).astype(int),
         }
     )
+    if probabilities is not None:
+        result["probability"] = probabilities.reset_index(drop=True)
+    return result
 
 
 def _event_report_text(
@@ -276,6 +371,7 @@ def _event_report_text(
 | Target | {metadata["target"]} |
 | Supervised rows | {metadata["supervised_rows"]} |
 | Event rate | {metadata["event_rate"]:.3f} |
+| Decision threshold | {metadata["decision_threshold"] if metadata["decision_threshold"] is not None else "n/a"} |
 
 ## Validation Metrics
 

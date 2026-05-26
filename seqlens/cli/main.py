@@ -9,6 +9,7 @@ from seqlens.experiments import (
     run_baseline,
     run_baseline_comparison,
     run_event_baseline,
+    with_event_model,
 )
 from seqlens.models import SUPPORTED_BASELINES
 
@@ -49,6 +50,12 @@ def main() -> None:
 
     run_event_parser = subcommands.add_parser("run-event", help="Run an event baseline experiment")
     run_event_parser.add_argument("config", help="Path to the event experiment YAML config")
+    run_event_parser.add_argument(
+        "--model",
+        default=None,
+        choices=["event_majority", "event_naive", "lgbm"],
+        help="Override the event model from config",
+    )
     run_event_parser.add_argument("--output-dir", default="runs", help="Directory for artifacts")
 
     args = parser.parse_args()
@@ -67,5 +74,7 @@ def main() -> None:
         print(result.summary())
     elif args.command == "run-event":
         config = EventExperimentConfig.from_yaml(args.config)
+        if args.model:
+            config = with_event_model(config, args.model)
         result = run_event_baseline(config, output_dir=args.output_dir)
         print(result.summary())
