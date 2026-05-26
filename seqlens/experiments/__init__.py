@@ -6,6 +6,7 @@ from seqlens.experiments.event_runner import (
     run_event_baseline,
     with_event_model,
     with_event_threshold,
+    with_threshold_strategy,
     with_observation_window,
 )
 from seqlens.experiments.runner import (
@@ -29,5 +30,6 @@ __all__ = [
     "run_naive_baseline",
     "with_event_model",
     "with_event_threshold",
+    "with_threshold_strategy",
     "with_observation_window",
 ]

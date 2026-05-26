@@ -55,6 +55,7 @@ automation:
   thresholds: [60, 80]
   observation_windows: [6]
   models: [event_majority]
+  threshold_strategies: [maximize_f1, maximize_recall]
 """,
         encoding="utf-8",
     )
@@ -72,6 +73,7 @@ automation:
     assert {"candidate", "threshold", "model", "validation_recall"}.issubset(
         leaderboard.columns
     )
+    assert "threshold_strategy" in leaderboard.columns
 
     distribution = pd.read_csv(result.distribution_path)
     assert {"split", "entity", "positive_support", "event_rate"}.issubset(

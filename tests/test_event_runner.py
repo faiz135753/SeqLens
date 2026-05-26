@@ -53,6 +53,8 @@ models:
   baselines: [event_majority]
 evaluation:
   primary_metric: recall
+  threshold_strategy:
+    name: maximize_recall
 """,
         encoding="utf-8",
     )

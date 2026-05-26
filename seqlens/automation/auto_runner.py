@@ -14,6 +14,7 @@ from seqlens.experiments import (
     run_event_baseline,
     with_event_model,
     with_event_threshold,
+    with_threshold_strategy,
     with_observation_window,
 )
 from seqlens.data.splitting import time_based_split
@@ -62,6 +63,11 @@ def run_auto_event_experiment(
         key="models",
         fallback=["event_majority", "lgbm"],
     )
+    threshold_strategies = _automation_values(
+        raw,
+        key="threshold_strategies",
+        fallback=[base_config.threshold_strategy],
+    )
 
     run_dir = _create_run_dir(output_dir, name="auto_event")
     frame = pd.read_csv(base_config.data_path)
@@ -83,30 +89,46 @@ def run_auto_event_experiment(
             continue
         for observation in observation_windows:
             for model in models:
-                candidate_name = (
-                    f"thr{_format_value(threshold)}_obs{int(observation)}_{model}"
-                )
-                candidate_dir = run_dir / candidate_name
-                candidate_config = with_event_model(
-                    with_observation_window(
-                        with_event_threshold(base_config, float(threshold)),
-                        int(observation),
-                    ),
-                    str(model),
-                )
-                try:
-                    result = run_event_baseline(candidate_config, output_dir=candidate_dir)
-                    rows.append(_leaderboard_row(candidate_name, threshold, observation, model, result))
-                except Exception as exc:  # noqa: BLE001
-                    errors.append(
-                        {
-                            "candidate": candidate_name,
-                            "threshold": threshold,
-                            "observation": observation,
-                            "model": model,
-                            "error": str(exc),
-                        }
+                strategies = threshold_strategies if model == "lgbm" else [base_config.threshold_strategy]
+                for strategy in strategies:
+                    candidate_name = (
+                        f"thr{_format_value(threshold)}_obs{int(observation)}_"
+                        f"{model}_{strategy}"
                     )
+                    candidate_dir = run_dir / candidate_name
+                    candidate_config = with_threshold_strategy(
+                        with_event_model(
+                            with_observation_window(
+                                with_event_threshold(base_config, float(threshold)),
+                                int(observation),
+                            ),
+                            str(model),
+                        ),
+                        str(strategy),
+                    )
+                    try:
+                        result = run_event_baseline(candidate_config, output_dir=candidate_dir)
+                        rows.append(
+                            _leaderboard_row(
+                                candidate_name,
+                                threshold,
+                                observation,
+                                model,
+                                strategy,
+                                result,
+                            )
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        errors.append(
+                            {
+                                "candidate": candidate_name,
+                                "threshold": threshold,
+                                "observation": observation,
+                                "model": model,
+                                "threshold_strategy": strategy,
+                                "error": str(exc),
+                            }
+                        )
 
     leaderboard = pd.DataFrame(rows)
     leaderboard_path = run_dir / "leaderboard.csv"
@@ -172,6 +194,7 @@ def _leaderboard_row(
     threshold: float,
     observation: int,
     model: str,
+    threshold_strategy: str,
     result: EventRunResult,
 ) -> dict[str, float | int | str | None]:
     return {
@@ -179,6 +202,7 @@ def _leaderboard_row(
         "threshold": threshold,
         "observation": observation,
         "model": model,
+        "threshold_strategy": threshold_strategy,
         "run_dir": str(result.run_dir),
         "decision_threshold": result.threshold,
         "event_rate": result.event_rate,
@@ -309,6 +333,7 @@ def _recommendations(
             "",
             f"- Candidate: `{best['candidate']}`",
             f"- Model: `{best['model']}`",
+            f"- Threshold strategy: `{best['threshold_strategy']}`",
             f"- Threshold: `{best['threshold']}`",
             f"- Observation window: `{best['observation']}`",
             f"- Validation recall: `{best['validation_recall']:.3f}`",
@@ -384,7 +409,7 @@ def _recommendations(
             "## Next Experiment Suggestions",
             "",
             "- Add station-level event distribution artifacts.",
-            "- Add threshold strategy modes beyond F1 maximization.",
+                "- Compare threshold strategy modes against operational warning goals.",
             "- Add rainfall-aware baselines such as rolling sum threshold.",
             "- Add humidity, pressure, wind, and pressure-change factors when available.",
         ]

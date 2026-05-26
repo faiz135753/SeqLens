@@ -142,6 +142,15 @@ event_majority -> lgbm -> leaderboard -> recommendations
 
 LSTM should only be promoted after LGBM shows stable validation and test signal.
 
+Supported threshold strategies for probability models:
+
+```text
+maximize_f1
+maximize_recall
+maximize_recall_with_precision_floor
+minimize_miss_rate_with_false_alarm_cap
+```
+
 The first external rainfall test notes are in:
 
 ```text

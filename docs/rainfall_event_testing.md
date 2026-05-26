@@ -417,6 +417,59 @@ For the 80 mm / 3h task, the overall split support is already too small:
 
 This confirms that the current data slice should not be promoted to LSTM. The next research step should improve event support and station balance first.
 
+## Threshold Strategy Test
+
+Auto-run now supports multiple threshold strategies for probability models:
+
+```text
+maximize_f1
+maximize_recall
+maximize_recall_with_precision_floor
+minimize_miss_rate_with_false_alarm_cap
+```
+
+Test setup:
+
+```yaml
+thresholds: [40, 60]
+observation_windows: [12]
+models: [event_majority, lgbm]
+threshold_strategies:
+  - maximize_f1
+  - maximize_recall
+  - maximize_recall_with_precision_floor
+  - minimize_miss_rate_with_false_alarm_cap
+```
+
+Key 40 mm / 3h results:
+
+| Strategy | Validation Recall | Validation F1 | Test Precision | Test Recall | Test F1 |
+|---|---:|---:|---:|---:|---:|
+| maximize_f1 | 0.500 | 0.091 | 0.077 | 0.016 | 0.026 |
+| maximize_recall | 0.512 | 0.073 | 0.013 | 0.172 | 0.025 |
+| maximize_recall_with_precision_floor | 0.500 | 0.091 | 0.077 | 0.016 | 0.026 |
+| minimize_miss_rate_with_false_alarm_cap | 0.500 | 0.091 | 0.077 | 0.016 | 0.026 |
+
+Interpretation:
+
+```text
+maximize_recall catches more test events, but precision collapses.
+```
+
+This means SeqLens should keep threshold strategy search as part of automated experimentation. For warning tasks, the best model depends on operational cost:
+
+```text
+High recall is useful when missed events are very costly.
+Higher precision is useful when false alarms are expensive.
+```
+
+Current recommendation:
+
+```text
+Do not use a single default threshold strategy for all domains.
+Let auto-run compare strategies and report the trade-off.
+```
+
 2. Add event-aware baselines.
 
    Useful baselines:

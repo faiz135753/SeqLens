@@ -32,6 +32,9 @@ class EventExperimentConfig:
     validation_size: float = 0.2
     test_size: float = 0.2
     model: str = "event_majority"
+    threshold_strategy: str = "maximize_f1"
+    precision_floor: float = 0.05
+    false_alarm_cap: float = 0.05
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "EventExperimentConfig":
@@ -42,6 +45,8 @@ class EventExperimentConfig:
         target = raw["target"]
         factors = raw["factors"]
         window = raw["window"]
+        evaluation = raw.get("evaluation", {})
+        threshold_strategy = evaluation.get("threshold_strategy", {})
         observation_windows = window.get("observation_windows") or [window["observation"]]
         horizons = window.get("horizons") or [target["horizon"]]
 
@@ -64,6 +69,9 @@ class EventExperimentConfig:
                 step=int(window.get("step", 1)),
             ),
             model=(raw.get("models", {}).get("baselines") or ["event_majority"])[0],
+            threshold_strategy=threshold_strategy.get("name", "maximize_f1"),
+            precision_floor=float(threshold_strategy.get("precision_floor", 0.05)),
+            false_alarm_cap=float(threshold_strategy.get("false_alarm_cap", 0.05)),
         )
 
 
@@ -117,7 +125,13 @@ def run_event_baseline(
             feature_columns=feature_columns,
         )
         validation_probabilities = predict_lgbm_event_probability(model, split.validation)
-        threshold = _choose_threshold(split.validation[target_col], validation_probabilities)
+        threshold = _choose_threshold(
+            split.validation[target_col],
+            validation_probabilities,
+            strategy=config.threshold_strategy,
+            precision_floor=config.precision_floor,
+            false_alarm_cap=config.false_alarm_cap,
+        )
         validation_predictions = (validation_probabilities >= threshold).astype("Int64")
 
         train_validation = pd.concat([split.train, split.validation], ignore_index=True)
@@ -171,6 +185,13 @@ def run_event_baseline(
 
 def with_event_model(config: EventExperimentConfig, model: str) -> EventExperimentConfig:
     return replace(config, model=model)
+
+
+def with_threshold_strategy(
+    config: EventExperimentConfig,
+    strategy: str,
+) -> EventExperimentConfig:
+    return replace(config, threshold_strategy=strategy)
 
 
 def with_event_threshold(config: EventExperimentConfig, threshold: float) -> EventExperimentConfig:
@@ -249,19 +270,52 @@ def _feature_columns(
     return feature_columns
 
 
-def _choose_threshold(actual: pd.Series, probabilities: pd.Series) -> float:
+def _choose_threshold(
+    actual: pd.Series,
+    probabilities: pd.Series,
+    *,
+    strategy: str,
+    precision_floor: float,
+    false_alarm_cap: float,
+) -> float:
     best_threshold = 0.5
-    best_f1 = -1.0
-    best_recall = -1.0
+    best_score: tuple[float, float, float] = (-1.0, -1.0, -1.0)
     for index in range(5, 96, 5):
         threshold = index / 100
         predicted = (probabilities >= threshold).astype(int)
         metrics = classification_metrics(actual, predicted)
-        if (metrics.f1, metrics.recall) > (best_f1, best_recall):
+        score = _threshold_score(
+            metrics,
+            strategy=strategy,
+            precision_floor=precision_floor,
+            false_alarm_cap=false_alarm_cap,
+        )
+        if score > best_score:
             best_threshold = threshold
-            best_f1 = metrics.f1
-            best_recall = metrics.recall
+            best_score = score
     return best_threshold
+
+
+def _threshold_score(
+    metrics: ClassificationMetrics,
+    *,
+    strategy: str,
+    precision_floor: float,
+    false_alarm_cap: float,
+) -> tuple[float, float, float]:
+    if strategy == "maximize_f1":
+        return (metrics.f1, metrics.recall, -metrics.false_alarm_rate)
+    if strategy == "maximize_recall":
+        return (metrics.recall, metrics.f1, -metrics.false_alarm_rate)
+    if strategy == "maximize_recall_with_precision_floor":
+        if metrics.precision < precision_floor:
+            return (-1.0, metrics.recall, -metrics.false_alarm_rate)
+        return (metrics.recall, metrics.f1, -metrics.false_alarm_rate)
+    if strategy == "minimize_miss_rate_with_false_alarm_cap":
+        if metrics.false_alarm_rate > false_alarm_cap:
+            return (-1.0, -metrics.miss_rate, metrics.precision)
+        return (-metrics.miss_rate, metrics.precision, metrics.f1)
+    raise ValueError(f"Unsupported threshold strategy: {strategy}")
 
 
 def _factor_spec_from_yaml(raw: dict) -> FactorSpec:
@@ -321,6 +375,7 @@ def _write_event_artifacts(
         "supervised_rows": len(supervised),
         "event_rate": float((supervised[target_col] == 1).mean()),
         "decision_threshold": threshold,
+        "threshold_strategy": config.threshold_strategy,
         "created_at": datetime.now(UTC).isoformat(),
     }
     with (run_dir / "metadata.yaml").open("w", encoding="utf-8") as file:
@@ -400,6 +455,7 @@ def _event_report_text(
 | Supervised rows | {metadata["supervised_rows"]} |
 | Event rate | {metadata["event_rate"]:.3f} |
 | Decision threshold | {metadata["decision_threshold"] if metadata["decision_threshold"] is not None else "n/a"} |
+| Threshold strategy | {metadata["threshold_strategy"]} |
 
 ## Validation Metrics
 

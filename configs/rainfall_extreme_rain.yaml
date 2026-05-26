@@ -38,8 +38,17 @@ models:
 evaluation:
   primary_metric: recall
   secondary_metrics: [precision, f1, pr_auc]
+  threshold_strategy:
+    name: maximize_f1
+    precision_floor: 0.05
+    false_alarm_cap: 0.05
 
 automation:
   thresholds: [40, 60, 80]
   observation_windows: [12, 24]
   models: [event_majority, lgbm]
+  threshold_strategies:
+    - maximize_f1
+    - maximize_recall
+    - maximize_recall_with_precision_floor
+    - minimize_miss_rate_with_false_alarm_cap
