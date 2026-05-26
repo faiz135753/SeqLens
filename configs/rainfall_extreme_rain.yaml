@@ -27,7 +27,7 @@ factors:
   rolling:
     columns: [rainfall]
     windows: [3, 6, 12, 24]
-    stats: [sum, max, mean, std]
+    stats: [sum, max, mean, std, nonzero_count, slope]
   calendar: [hour, month, season]
 
 models:

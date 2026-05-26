@@ -72,6 +72,7 @@ automation:
     assert result.leaderboard_path.exists()
     assert result.distribution_path.exists()
     assert result.diagnosis_path.exists()
+    assert result.factor_recommendations_path.exists()
     assert result.recommendations_path.exists()
     assert result.report_path.exists()
 
@@ -92,3 +93,10 @@ automation:
     assert {"stage", "status", "reason"}.issubset(diagnosis.columns)
     assert {"lgbm", "lstm"}.issubset(set(diagnosis["stage"]))
     assert (result.run_dir / "experiment_diagnosis.md").exists()
+
+    factor_recommendations = pd.read_csv(result.factor_recommendations_path)
+    assert {"column", "factor_type", "windows", "parameters"}.issubset(
+        factor_recommendations.columns
+    )
+    assert "rainfall" in set(factor_recommendations["column"])
+    assert (result.run_dir / "factor_recommendations.md").exists()

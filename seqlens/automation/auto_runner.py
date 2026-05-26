@@ -12,6 +12,11 @@ from seqlens.automation.planner import (
     diagnosis_to_markdown,
     diagnose_auto_experiment,
 )
+from seqlens.automation.factor_planner import (
+    factor_recommendations_to_frame,
+    factor_recommendations_to_markdown,
+    recommend_event_factors,
+)
 from seqlens.data.splitting import time_based_split
 from seqlens.experiments import (
     EventExperimentConfig,
@@ -31,6 +36,7 @@ class AutoExperimentResult:
     leaderboard_path: Path
     distribution_path: Path
     diagnosis_path: Path
+    factor_recommendations_path: Path
     recommendations_path: Path
     report_path: Path
     candidate_count: int
@@ -42,6 +48,7 @@ class AutoExperimentResult:
             f"Leaderboard: {self.leaderboard_path}\n"
             f"Event distribution: {self.distribution_path}\n"
             f"Experiment diagnosis: {self.diagnosis_path}\n"
+            f"Factor recommendations: {self.factor_recommendations_path}\n"
             f"Recommendations: {self.recommendations_path}\n"
             f"Final report: {self.report_path}"
         )
@@ -88,6 +95,17 @@ def run_auto_event_experiment(
     distribution.to_csv(distribution_path, index=False)
     distribution_md_path = run_dir / "event_distribution.md"
     distribution_md_path.write_text(_event_distribution_markdown(distribution), encoding="utf-8")
+    factor_recommendations = recommend_event_factors(frame, base_config)
+    factor_recommendations_path = run_dir / "factor_recommendations.csv"
+    factor_recommendations_to_frame(factor_recommendations).to_csv(
+        factor_recommendations_path,
+        index=False,
+    )
+    factor_recommendations_md = factor_recommendations_to_markdown(factor_recommendations)
+    (run_dir / "factor_recommendations.md").write_text(
+        factor_recommendations_md,
+        encoding="utf-8",
+    )
 
     rows = []
     errors = []
@@ -160,6 +178,7 @@ def run_auto_event_experiment(
             leaderboard=leaderboard,
             distribution=distribution,
             diagnosis_markdown=diagnosis_to_markdown(diagnosis),
+            factor_recommendations_markdown=factor_recommendations_md,
             errors=errors,
             recommendations=recommendations,
         ),
@@ -171,6 +190,7 @@ def run_auto_event_experiment(
         leaderboard_path=leaderboard_path,
         distribution_path=distribution_path,
         diagnosis_path=diagnosis_path,
+        factor_recommendations_path=factor_recommendations_path,
         recommendations_path=recommendations_path,
         report_path=report_path,
         candidate_count=len(rows) + len(errors),
@@ -441,6 +461,7 @@ def _final_report(
     leaderboard: pd.DataFrame,
     distribution: pd.DataFrame,
     diagnosis_markdown: str,
+    factor_recommendations_markdown: str,
     errors: list[dict],
     recommendations: str,
 ) -> str:
@@ -464,6 +485,10 @@ def _final_report(
 ## Experiment Diagnosis
 
 {diagnosis_markdown}
+
+## Factor Recommendations
+
+{factor_recommendations_markdown}
 
 ## Failed Candidates
 

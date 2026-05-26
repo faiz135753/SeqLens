@@ -47,6 +47,7 @@ SeqLens standardizes this process with:
   - difference factors
   - ratio-to-rolling-mean factors
   - calendar factors
+  - generic event precursor factors such as rolling nonzero count and slope
 - Window slicer for supervised experiment frames
 - Domain presets:
   - rainfall extreme rain warning
@@ -134,6 +135,8 @@ event_distribution.csv
 event_distribution.md
 experiment_diagnosis.csv
 experiment_diagnosis.md
+factor_recommendations.csv
+factor_recommendations.md
 leaderboard.csv
 recommendations.md
 final_report.md
@@ -153,6 +156,9 @@ spikes, traffic load, or energy demand events.
 LSTM should only be promoted after LGBM shows stable validation and test signal.
 The experiment diagnosis artifact records whether the next modeling stage is
 `promote`, `caution`, or `blocked`, along with the reason and next actions.
+The factor recommendation artifact suggests generic next-round feature recipes
+from available numeric columns, which is the bridge toward planner-driven config
+generation.
 
 Supported threshold strategies for probability models:
 
@@ -214,7 +220,7 @@ factors:
   rolling:
     columns: [rainfall]
     windows: [3, 6, 12, 24]
-    stats: [sum, max, mean, std]
+    stats: [sum, max, mean, std, nonzero_count, slope]
   calendar: [hour, month, season]
 ```
 

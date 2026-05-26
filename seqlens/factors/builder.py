@@ -76,7 +76,17 @@ def _rolling_stat(rolling: pd.core.window.Rolling, stat: str) -> pd.Series:
         return rolling.min()
     if stat == "std":
         return rolling.std()
+    if stat == "nonzero_count":
+        return rolling.apply(lambda values: (values != 0).sum(), raw=True)
+    if stat == "slope":
+        return rolling.apply(_window_slope, raw=True)
     raise ValueError(f"Unsupported rolling stat: {stat}")
+
+
+def _window_slope(values) -> float:
+    if len(values) < 2:
+        return 0.0
+    return (values[-1] - values[0]) / (len(values) - 1)
 
 
 def _calendar_field(time: pd.Series, field_name: str) -> pd.Series:
@@ -97,4 +107,3 @@ def _calendar_field(time: pd.Series, field_name: str) -> pd.Series:
 def _validate_positive(value: int, name: str) -> None:
     if value < 1:
         raise ValueError(f"{name} must be at least 1.")
-

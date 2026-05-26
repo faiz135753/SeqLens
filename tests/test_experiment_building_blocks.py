@@ -37,7 +37,7 @@ def test_factor_builder_creates_lag_rolling_ratio_and_calendar_factors() -> None
         lag_periods=[1],
         rolling_columns=["close"],
         rolling_windows=[3],
-        rolling_stats=["mean"],
+        rolling_stats=["mean", "nonzero_count", "slope"],
         ratio_to_rolling_mean_columns=["close"],
         ratio_windows=[3],
         calendar=["day_of_week", "month"],
@@ -47,6 +47,8 @@ def test_factor_builder_creates_lag_rolling_ratio_and_calendar_factors() -> None
 
     assert "close_lag_1" in factors.columns
     assert "close_roll_3_mean" in factors.columns
+    assert "close_roll_3_nonzero_count" in factors.columns
+    assert "close_roll_3_slope" in factors.columns
     assert "close_ratio_roll_3_mean" in factors.columns
     assert "day_of_week" in factors.columns
     assert "month" in factors.columns
@@ -90,4 +92,3 @@ def test_domain_presets_generate_experiment_candidates() -> None:
     assert len(rainfall_candidates) == 6
     assert len(stock_candidates) == 4
     assert stock_candidates[0].primary_metric == "f1"
-
