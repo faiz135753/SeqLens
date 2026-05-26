@@ -52,6 +52,7 @@ evaluation:
 
 automation:
   thresholds: [40, 60, 80]
+  horizons: [3, 6, 12]
   observation_windows: [12, 24]
   models: [event_majority, recent_window_threshold, lgbm]
   threshold_strategies:

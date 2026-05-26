@@ -17,6 +17,7 @@ from seqlens.automation.factor_planner import (
     factor_recommendations_to_markdown,
     recommend_event_factors,
 )
+from seqlens.automation.event_support import event_support_markdown, event_support_plan
 from seqlens.data.splitting import time_based_split
 from seqlens.experiments import (
     EventExperimentConfig,
@@ -35,6 +36,7 @@ class AutoExperimentResult:
     run_dir: Path
     leaderboard_path: Path
     distribution_path: Path
+    support_plan_path: Path
     diagnosis_path: Path
     factor_recommendations_path: Path
     recommendations_path: Path
@@ -47,6 +49,7 @@ class AutoExperimentResult:
             f"Candidates: {self.candidate_count}\n"
             f"Leaderboard: {self.leaderboard_path}\n"
             f"Event distribution: {self.distribution_path}\n"
+            f"Event support plan: {self.support_plan_path}\n"
             f"Experiment diagnosis: {self.diagnosis_path}\n"
             f"Factor recommendations: {self.factor_recommendations_path}\n"
             f"Recommendations: {self.recommendations_path}\n"
@@ -72,6 +75,11 @@ def run_auto_event_experiment(
         key="observation_windows",
         fallback=[base_config.window.observation],
     )
+    horizons = _automation_values(
+        raw,
+        key="horizons",
+        fallback=[base_config.target.horizon],
+    )
     models = _automation_values(
         raw,
         key="models",
@@ -95,6 +103,19 @@ def run_auto_event_experiment(
     distribution.to_csv(distribution_path, index=False)
     distribution_md_path = run_dir / "event_distribution.md"
     distribution_md_path.write_text(_event_distribution_markdown(distribution), encoding="utf-8")
+    support_plan = event_support_plan(
+        frame,
+        base_config,
+        thresholds=thresholds,
+        horizons=horizons,
+    )
+    support_plan_path = run_dir / "event_support_plan.csv"
+    support_plan.to_csv(support_plan_path, index=False)
+    support_plan_markdown = event_support_markdown(support_plan)
+    (run_dir / "event_support_plan.md").write_text(
+        support_plan_markdown,
+        encoding="utf-8",
+    )
     factor_recommendations = recommend_event_factors(frame, base_config)
     factor_recommendations_path = run_dir / "factor_recommendations.csv"
     factor_recommendations_to_frame(factor_recommendations).to_csv(
@@ -177,6 +198,7 @@ def run_auto_event_experiment(
         _final_report(
             leaderboard=leaderboard,
             distribution=distribution,
+            support_plan_markdown=support_plan_markdown,
             diagnosis_markdown=diagnosis_to_markdown(diagnosis),
             factor_recommendations_markdown=factor_recommendations_md,
             errors=errors,
@@ -189,6 +211,7 @@ def run_auto_event_experiment(
         run_dir=run_dir,
         leaderboard_path=leaderboard_path,
         distribution_path=distribution_path,
+        support_plan_path=support_plan_path,
         diagnosis_path=diagnosis_path,
         factor_recommendations_path=factor_recommendations_path,
         recommendations_path=recommendations_path,
@@ -460,6 +483,7 @@ def _recommendations(
 def _final_report(
     leaderboard: pd.DataFrame,
     distribution: pd.DataFrame,
+    support_plan_markdown: str,
     diagnosis_markdown: str,
     factor_recommendations_markdown: str,
     errors: list[dict],
@@ -481,6 +505,10 @@ def _final_report(
 ## Event Distribution Summary
 
 {_event_distribution_markdown(distribution)}
+
+## Event Support Plan
+
+{support_plan_markdown}
 
 ## Experiment Diagnosis
 

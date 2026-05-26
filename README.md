@@ -133,6 +133,8 @@ seqlens auto-run configs/rainfall_extreme_rain.yaml
 ```text
 event_distribution.csv
 event_distribution.md
+event_support_plan.csv
+event_support_plan.md
 experiment_diagnosis.csv
 experiment_diagnosis.md
 factor_recommendations.csv
@@ -145,8 +147,12 @@ final_report.md
 For rainfall warning experiments, the current automation path is:
 
 ```text
-event_majority -> recent_window_threshold -> lgbm -> experiment diagnosis -> recommendations
+event support scan -> event_majority -> recent_window_threshold -> lgbm -> experiment diagnosis -> recommendations
 ```
+
+The event support plan scans threshold and horizon combinations before model
+promotion. It labels event definitions as `stable`, `usable`, `sparse`, or
+`too_sparse` based on positive support in each split.
 
 `recent_window_threshold` is a generic event-aware baseline. It compares a rolling
 factor, such as a recent sum, max, mean, or volatility proxy, against a threshold.

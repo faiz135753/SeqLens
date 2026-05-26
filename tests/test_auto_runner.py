@@ -59,6 +59,7 @@ evaluation:
   primary_metric: recall
 automation:
   thresholds: [60, 80]
+  horizons: [3, 6]
   observation_windows: [6]
   models: [event_majority, recent_window_threshold]
   threshold_strategies: [maximize_f1, maximize_recall]
@@ -71,6 +72,7 @@ automation:
     assert result.candidate_count == 4
     assert result.leaderboard_path.exists()
     assert result.distribution_path.exists()
+    assert result.support_plan_path.exists()
     assert result.diagnosis_path.exists()
     assert result.factor_recommendations_path.exists()
     assert result.recommendations_path.exists()
@@ -88,6 +90,11 @@ automation:
         distribution.columns
     )
     assert set(distribution["split"]) == {"train", "validation", "test"}
+
+    support_plan = pd.read_csv(result.support_plan_path)
+    assert {"threshold", "horizon", "support_status"}.issubset(support_plan.columns)
+    assert set(support_plan["horizon"]) == {3, 6}
+    assert (result.run_dir / "event_support_plan.md").exists()
 
     diagnosis = pd.read_csv(result.diagnosis_path)
     assert {"stage", "status", "reason"}.issubset(diagnosis.columns)

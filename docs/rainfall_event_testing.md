@@ -578,3 +578,38 @@ Let auto-run compare strategies and report the trade-off.
 6. Add data availability checks.
 
    Before running experiments, report missing station/year files and skipped stations.
+
+## Extreme Event Support Planning
+
+SeqLens now writes:
+
+```text
+event_support_plan.csv
+event_support_plan.md
+```
+
+This artifact scans threshold and horizon combinations before model promotion.
+It is intended for rare or extreme event tasks where the original target may be
+too sparse for stable validation.
+
+Using the six-station rainfall sample, support improved substantially when the
+future accumulation horizon was increased:
+
+| Threshold | Horizon | Minimum Split Positive Support | Mean Event Rate |
+|---:|---:|---:|---:|
+| 40 | 3 | 64 | 0.0029 |
+| 40 | 6 | 164 | 0.0078 |
+| 40 | 12 | 386 | 0.0185 |
+| 60 | 3 | 23 | 0.0010 |
+| 60 | 6 | 93 | 0.0037 |
+| 60 | 12 | 206 | 0.0094 |
+| 80 | 3 | 7 | 0.0003 |
+| 80 | 6 | 33 | 0.0017 |
+| 80 | 12 | 119 | 0.0056 |
+
+Interpretation:
+
+- `80mm / 3h` is too sparse for reliable learned-model evaluation.
+- `80mm / 6h` becomes barely usable for LGBM experimentation.
+- `80mm / 12h` has enough support to test learned models more responsibly.
+- Horizon planning is a cleaner first step than synthetic oversampling for rare events.
