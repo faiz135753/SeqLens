@@ -1,0 +1,45 @@
+domain: stock
+task_type: classification
+
+data:
+  path: data/stock_daily.csv
+  time_col: date
+  entity_col: symbol
+  frequency: daily
+
+target:
+  type: future_direction
+  column: close
+  horizon: 1
+  name: close_direction_next_1d
+
+window:
+  observation_windows: [10, 20, 30, 60]
+  horizons: [1]
+  step: 1
+
+factors:
+  lag:
+    columns: [close, volume]
+    periods: [1, 2, 5, 10, 20]
+  rolling:
+    columns: [close]
+    windows: [5, 10, 20]
+    stats: [mean, std, min, max]
+  diff:
+    columns: [close]
+    periods: [1, 5, 20]
+  ratio_to_rolling_mean:
+    columns: [close]
+    windows: [5, 20]
+  calendar: [day_of_week, month]
+
+models:
+  baselines: [event_naive]
+  tabular: [lgbm]
+  sequence: [lstm]
+
+evaluation:
+  primary_metric: f1
+  secondary_metrics: [precision, recall, direction_accuracy]
+

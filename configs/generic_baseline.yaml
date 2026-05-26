@@ -10,4 +10,4 @@ seed: 42
 models:
   - naive
   - moving_average
-  - lstm
+

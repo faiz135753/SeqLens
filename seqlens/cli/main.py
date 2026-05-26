@@ -46,10 +46,7 @@ def main() -> None:
     if args.command == "diagnose":
         project = SeqLens(args.csv, time_col=args.time, target_col=args.target)
         diagnostics = project.diagnose()
-        suitability = project.score_lstm_suitability()
         print(diagnostics.summary())
-        print()
-        print(suitability.summary())
     elif args.command == "run-baseline":
         config = ExperimentConfig.from_yaml(args.config)
         result = run_baseline(config, model_name=args.model, output_dir=args.output_dir)

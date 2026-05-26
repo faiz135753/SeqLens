@@ -5,14 +5,14 @@ build-backend = "hatchling.build"
 [project]
 name = "seqlens"
 version = "0.1.0"
-description = "A guardrailed research assistant for LSTM time-series diagnostics, model comparison, and reproducible experiment planning."
+description = "A cross-domain automated time-series experiment framework for target building, factor engineering, model comparison, and reproducible reports."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [
   { name = "SeqLens contributors" }
 ]
-keywords = ["time-series", "lstm", "forecasting", "research", "llm", "automl"]
+keywords = ["time-series", "forecasting", "factors", "lgbm", "lstm", "research", "automl"]
 dependencies = [
   "matplotlib>=3.8",
   "numpy>=1.24",

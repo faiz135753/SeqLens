@@ -1,0 +1,41 @@
+domain: rainfall
+task_type: classification
+
+data:
+  path: data/rainfall_hourly.csv
+  time_col: datetime
+  entity_col: station_id
+  frequency: hourly
+
+target:
+  type: future_window_event
+  column: rainfall
+  horizon: 3
+  aggregation: sum
+  threshold: 80
+  name: heavy_rain_next_3h
+
+window:
+  observation_windows: [12, 24, 48]
+  horizons: [3]
+  step: 1
+
+factors:
+  lag:
+    columns: [rainfall]
+    periods: [1, 2, 3, 6, 12, 24]
+  rolling:
+    columns: [rainfall]
+    windows: [3, 6, 12, 24]
+    stats: [sum, max, mean, std]
+  calendar: [hour, month, season]
+
+models:
+  baselines: [event_naive]
+  tabular: [lgbm]
+  sequence: [lstm]
+
+evaluation:
+  primary_metric: recall
+  secondary_metrics: [precision, f1, pr_auc]
+

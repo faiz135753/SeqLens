@@ -1,137 +1,248 @@
-# SeqLens Design Flow
+# SeqLens Redesign
 
-SeqLens is designed as a guardrailed LSTM research assistant, not a stock prediction promise machine.
+SeqLens is being rebuilt as a cross-domain automated time-series experiment framework.
 
-The project should help users answer three practical questions:
-
-1. Is my time-series data clean enough for sequence modeling?
-2. Is LSTM a reasonable model to try, or are simple baselines enough?
-3. If the model performs poorly, what should I try next without breaking research validity?
-
-## System Flow
+The central abstraction is:
 
 ```text
-Load CSV data
-→ Validate time and target columns
-→ Diagnose time-series quality
-→ Score LSTM suitability
-→ Create baseline experiments
-→ Train candidate models
-→ Evaluate with validation metrics
-→ Let planner suggest the next experiment config
-→ Execute only validated configs
-→ Save config, seed, metrics, plots, and reasoning
-→ Generate research report
+past observation window -> future prediction window
 ```
 
-## Core Modules
+Any domain-specific task should be decomposed into:
+
+1. Data Adapter
+2. Domain Preset
+3. Target Builder
+4. Window Slicer
+5. Factor Builder
+6. Experiment Generator
+7. Experiment Engine
+8. Evaluator
+9. Reporter
+10. Planner
+
+## Why This Design
+
+Rainfall, stock, energy, sales, and sensor problems look different, but the experiment structure is similar:
 
 ```text
-data
-  Load and validate user datasets.
-
-diagnostics
-  Detect missing values, duplicate timestamps, irregular intervals, outliers,
-  autocorrelation, and trend.
-
-suitability
-  Convert diagnostics into an LSTM suitability score with reasons and warnings.
-
-experiments
-  Store reproducible experiment configs and eventually run folders.
-
-models
-  Planned: naive, moving average, ARIMA, tree-based models, LSTM, GRU.
-
-evaluation
-  Calculate MAE, RMSE, MAPE, and direction accuracy. Planned: sMAPE and
-  training time.
-
-agent
-  Planned: restricted LLM planner that proposes the next config but never runs
-  arbitrary code.
+define target
+slice history and future windows
+generate factors
+run cheap baselines
+run LGBM as a strong factor model
+promote to LSTM only if sequence modeling is justified
+compare models
+write reports
 ```
 
-## LLM-Guided Optimization
+This makes LSTM and LGBM model plugins, not the core architecture.
 
-The LLM should act as a research planner, not as an unrestricted programmer.
+## Target Builder
+
+Turns raw columns into supervised labels.
+
+Supported MVP target types:
+
+```text
+future_value
+future_return
+future_direction
+future_window_event
+```
+
+Examples:
+
+```text
+Stock:
+close_direction_next_1 = close[t+1] > close[t]
+
+Rainfall:
+heavy_rain_next_3h = sum(rainfall[t+1:t+3]) >= 80
+```
+
+## Window Slicer
+
+Defines how observations become model-ready samples.
+
+```yaml
+window:
+  observation_windows: [12, 24, 48]
+  horizons: [1, 3, 6]
+  step: 1
+```
+
+For LGBM, the slicer produces a 2D tabular factor matrix.
+
+```text
+samples x factors
+```
+
+For LSTM, planned, it will produce a 3D sequence tensor.
+
+```text
+samples x timesteps x factors
+```
+
+## Factor Builder
+
+Creates reusable cross-domain factors from raw columns.
+
+Factor families:
+
+```text
+lag
+rolling
+difference
+ratio_to_rolling_mean
+calendar
+interaction, planned
+technical indicators, planned
+meteorological indicators, planned
+```
+
+Rainfall examples:
+
+```text
+rainfall_lag_1
+rainfall_roll_6_sum
+rainfall_roll_24_max
+hour
+season
+```
+
+Stock examples:
+
+```text
+close_lag_1
+close_diff_5
+close_ratio_roll_20_mean
+day_of_week
+```
+
+## Experiment Generator
+
+Expands presets into candidate experiments.
+
+Example:
+
+```text
+rainfall_extreme_rain_lgbm_obs12_h3
+rainfall_extreme_rain_lgbm_obs24_h3
+rainfall_extreme_rain_lstm_obs24_h3
+```
+
+The generator is the foundation for automated experimentation. It lets SeqLens search target definitions, windows, factor combinations, and model families without human brainstorming every round.
+
+## Automation Roadmap
+
+Automation should progress in layers:
+
+```text
+rule-based planner
+-> search planner
+-> Optuna planner
+-> LLM planner
+```
+
+The planner should output structured experiment configs only.
 
 Allowed:
 
-- Read diagnostics and metrics
-- Explain likely failure modes
-- Propose the next experiment as structured YAML or JSON
-- Recommend whether to stop, continue, or simplify the model
+- propose target candidates
+- propose factor sets
+- propose observation windows
+- choose model families
+- stop when no validation improvement appears
 
 Not allowed:
 
-- Modify training code in normal user mode
-- Use test metrics for iterative tuning
-- Run unlimited training loops
-- Bypass data leakage checks
-- Produce investment advice
+- edit arbitrary code
+- optimize on test data
+- bypass leakage checks
+- hide failed experiments
 
-## Planned Agent Contract
-
-Future versions should expose a small tool surface:
+## Model Roles
 
 ```text
-diagnose_data(config)
-run_experiment(config)
-evaluate_run(run_id)
-compare_runs(run_ids)
-suggest_next_config(context)
-generate_report(run_id)
+naive / moving_average
+  Minimum benchmarks.
+
+LGBM
+  Strong tabular factor model. Used to detect whether factors contain learnable signal.
+
+LSTM
+  Sequence model. Used after baselines and LGBM justify the added complexity.
 ```
 
-The LLM output should be validated against a schema before execution:
+## Rainfall Path
 
-```yaml
-sequence_length: 30
-hidden_units: 64
-dropout: 0.2
-learning_rate: 0.001
-batch_size: 32
-features:
-  - close
-  - volume
-objective: minimize_validation_rmse
-reason: Reduce overfitting while preserving recent market signal.
+First rainfall task:
+
+```text
+Predict whether the next 3 hours have cumulative rainfall >= 80 mm.
 ```
 
-## Financial Time-Series Guardrails
+Recommended first model:
 
-For stock-like data, SeqLens should eventually check:
+```text
+LGBMClassifier
+```
 
-- Train / validation / test split is time-based
-- Scalers are fit only on training data
-- Rolling indicators do not use future values
-- Test data is used only once for final reporting
-- Baselines are compared before promoting LSTM results
-- Direction accuracy is reported alongside regression metrics
-- Reports clearly state that forecasts are research outputs, not trading advice
+Recommended metrics:
 
-## MVP Boundary
+```text
+recall
+precision
+f1
+pr_auc
+false_alarm_rate
+miss_rate
+```
 
-Current MVP includes:
+## Stock Path
 
-- Python package structure
+First stock task:
+
+```text
+Predict whether next-day close direction is positive.
+```
+
+Recommended first model:
+
+```text
+LGBMClassifier
+```
+
+Recommended metrics:
+
+```text
+f1
+precision
+recall
+direction_accuracy
+```
+
+## Current MVP Boundary
+
+Implemented:
+
 - CSV loader
-- Time-series diagnostics
-- LSTM suitability score
-- CLI diagnosis command
-- Time-based train / validation / test splitting
-- Naive and moving average baselines
-- Baseline comparison table
-- Markdown baseline comparison report
-- MAE, RMSE, MAPE, and direction accuracy metrics
-- Run artifact storage under `runs/`
-- Markdown report generation
-- Actual-vs-predicted PNG plots
-- Example config and sample CSV
-- Basic test coverage
+- time-series diagnostics
+- time-based train / validation / test split
+- baseline regression experiments
+- baseline reports and comparison reports
+- target builder
+- factor builder
+- window slicer
+- rainfall and stock presets
+- experiment candidate generator
 
-Next development milestone:
+Next:
 
-- Add basic LSTM training
-- Add LSTM vs baseline comparison reports
+- classification metrics
+- event baseline
+- LGBM optional plugin
+- leakage report
+- automated factor search
+
