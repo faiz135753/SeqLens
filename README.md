@@ -104,6 +104,19 @@ Compare baselines:
 seqlens compare-baselines configs/generic_baseline.yaml
 ```
 
+Run an event baseline experiment:
+
+```bash
+python scripts/prepare_rainfall_sample.py
+seqlens run-event configs/rainfall_extreme_rain.yaml
+```
+
+The first external rainfall test notes are in:
+
+```text
+docs/rainfall_event_testing.md
+```
+
 ## Factor Builder Example
 
 ```python
@@ -200,4 +213,3 @@ seqlens/
 ## Design Rule
 
 LLM or automated planners should not edit arbitrary training code. They should generate structured experiment candidates that SeqLens validates and executes.
-

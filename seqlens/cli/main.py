@@ -3,7 +3,13 @@ from __future__ import annotations
 import argparse
 
 from seqlens import SeqLens
-from seqlens.experiments import ExperimentConfig, run_baseline, run_baseline_comparison
+from seqlens.experiments import (
+    EventExperimentConfig,
+    ExperimentConfig,
+    run_baseline,
+    run_baseline_comparison,
+    run_event_baseline,
+)
 from seqlens.models import SUPPORTED_BASELINES
 
 
@@ -41,6 +47,10 @@ def main() -> None:
         help="Directory for comparison artifacts",
     )
 
+    run_event_parser = subcommands.add_parser("run-event", help="Run an event baseline experiment")
+    run_event_parser.add_argument("config", help="Path to the event experiment YAML config")
+    run_event_parser.add_argument("--output-dir", default="runs", help="Directory for artifacts")
+
     args = parser.parse_args()
 
     if args.command == "diagnose":
@@ -54,4 +64,8 @@ def main() -> None:
     elif args.command == "compare-baselines":
         config = ExperimentConfig.from_yaml(args.config)
         result = run_baseline_comparison(config, output_dir=args.output_dir)
+        print(result.summary())
+    elif args.command == "run-event":
+        config = EventExperimentConfig.from_yaml(args.config)
+        result = run_event_baseline(config, output_dir=args.output_dir)
         print(result.summary())

@@ -4,6 +4,7 @@ import pandas as pd
 
 
 SUPPORTED_BASELINES = ("naive", "moving_average")
+SUPPORTED_EVENT_BASELINES = ("event_majority",)
 
 
 def naive_forecast(
@@ -57,3 +58,15 @@ def baseline_forecast(
         )
     supported = ", ".join(SUPPORTED_BASELINES)
     raise ValueError(f"Unsupported baseline model: {model_name}. Supported models: {supported}")
+
+
+def event_majority_forecast(history: pd.Series, horizon: int) -> pd.Series:
+    if horizon < 1:
+        raise ValueError("horizon must be at least 1.")
+    clean_history = pd.to_numeric(history, errors="coerce").dropna()
+    if clean_history.empty:
+        raise ValueError("Event majority forecast requires at least one historical label.")
+
+    positive_rate = float((clean_history == 1).mean())
+    majority_class = 1 if positive_rate >= 0.5 else 0
+    return pd.Series([majority_class] * horizon, dtype="Int64")

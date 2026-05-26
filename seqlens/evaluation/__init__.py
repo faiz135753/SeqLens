@@ -1,4 +1,13 @@
-from seqlens.evaluation.metrics import RegressionMetrics, regression_metrics
+from seqlens.evaluation.metrics import (
+    ClassificationMetrics,
+    RegressionMetrics,
+    classification_metrics,
+    regression_metrics,
+)
 
-__all__ = ["RegressionMetrics", "regression_metrics"]
-
+__all__ = [
+    "ClassificationMetrics",
+    "RegressionMetrics",
+    "classification_metrics",
+    "regression_metrics",
+]
