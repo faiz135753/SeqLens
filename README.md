@@ -132,6 +132,8 @@ seqlens auto-run configs/rainfall_extreme_rain.yaml
 ```text
 event_distribution.csv
 event_distribution.md
+experiment_diagnosis.csv
+experiment_diagnosis.md
 leaderboard.csv
 recommendations.md
 final_report.md
@@ -140,7 +142,7 @@ final_report.md
 For rainfall warning experiments, the current automation path is:
 
 ```text
-event_majority -> recent_window_threshold -> lgbm -> leaderboard -> recommendations
+event_majority -> recent_window_threshold -> lgbm -> experiment diagnosis -> recommendations
 ```
 
 `recent_window_threshold` is a generic event-aware baseline. It compares a rolling
@@ -149,6 +151,8 @@ The same pattern can represent rainfall accumulation, price volatility, sensor
 spikes, traffic load, or energy demand events.
 
 LSTM should only be promoted after LGBM shows stable validation and test signal.
+The experiment diagnosis artifact records whether the next modeling stage is
+`promote`, `caution`, or `blocked`, along with the reason and next actions.
 
 Supported threshold strategies for probability models:
 

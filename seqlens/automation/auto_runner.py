@@ -7,6 +7,12 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
+from seqlens.automation.planner import (
+    diagnosis_to_frame,
+    diagnosis_to_markdown,
+    diagnose_auto_experiment,
+)
+from seqlens.data.splitting import time_based_split
 from seqlens.experiments import (
     EventExperimentConfig,
     EventRunResult,
@@ -17,7 +23,6 @@ from seqlens.experiments import (
     with_threshold_strategy,
     with_observation_window,
 )
-from seqlens.data.splitting import time_based_split
 
 
 @dataclass(frozen=True)
@@ -25,6 +30,7 @@ class AutoExperimentResult:
     run_dir: Path
     leaderboard_path: Path
     distribution_path: Path
+    diagnosis_path: Path
     recommendations_path: Path
     report_path: Path
     candidate_count: int
@@ -35,6 +41,7 @@ class AutoExperimentResult:
             f"Candidates: {self.candidate_count}\n"
             f"Leaderboard: {self.leaderboard_path}\n"
             f"Event distribution: {self.distribution_path}\n"
+            f"Experiment diagnosis: {self.diagnosis_path}\n"
             f"Recommendations: {self.recommendations_path}\n"
             f"Final report: {self.report_path}"
         )
@@ -137,7 +144,13 @@ def run_auto_event_experiment(
     if errors:
         pd.DataFrame(errors).to_csv(run_dir / "errors.csv", index=False)
 
-    recommendations = _recommendations(leaderboard, errors, distribution)
+    diagnosis = diagnose_auto_experiment(leaderboard, distribution)
+    diagnosis_path = run_dir / "experiment_diagnosis.csv"
+    diagnosis_to_frame(diagnosis).to_csv(diagnosis_path, index=False)
+    diagnosis_md_path = run_dir / "experiment_diagnosis.md"
+    diagnosis_md_path.write_text(diagnosis_to_markdown(diagnosis), encoding="utf-8")
+
+    recommendations = _recommendations(leaderboard, errors, distribution, diagnosis)
     recommendations_path = run_dir / "recommendations.md"
     recommendations_path.write_text(recommendations, encoding="utf-8")
 
@@ -146,6 +159,7 @@ def run_auto_event_experiment(
         _final_report(
             leaderboard=leaderboard,
             distribution=distribution,
+            diagnosis_markdown=diagnosis_to_markdown(diagnosis),
             errors=errors,
             recommendations=recommendations,
         ),
@@ -156,6 +170,7 @@ def run_auto_event_experiment(
         run_dir=run_dir,
         leaderboard_path=leaderboard_path,
         distribution_path=distribution_path,
+        diagnosis_path=diagnosis_path,
         recommendations_path=recommendations_path,
         report_path=report_path,
         candidate_count=len(rows) + len(errors),
@@ -317,6 +332,7 @@ def _recommendations(
     leaderboard: pd.DataFrame,
     errors: list[dict],
     distribution: pd.DataFrame,
+    diagnosis,
 ) -> str:
     lines = ["# Recommendations", ""]
     if leaderboard.empty:
@@ -406,6 +422,10 @@ def _recommendations(
 
     lines.extend(
         [
+            "## Promotion Decision",
+            "",
+            diagnosis_to_markdown(diagnosis),
+            "",
             "## Next Experiment Suggestions",
             "",
             "- Compare threshold strategy modes against operational goals.",
@@ -420,6 +440,7 @@ def _recommendations(
 def _final_report(
     leaderboard: pd.DataFrame,
     distribution: pd.DataFrame,
+    diagnosis_markdown: str,
     errors: list[dict],
     recommendations: str,
 ) -> str:
@@ -439,6 +460,10 @@ def _final_report(
 ## Event Distribution Summary
 
 {_event_distribution_markdown(distribution)}
+
+## Experiment Diagnosis
+
+{diagnosis_markdown}
 
 ## Failed Candidates
 

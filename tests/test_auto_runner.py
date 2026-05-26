@@ -71,6 +71,7 @@ automation:
     assert result.candidate_count == 4
     assert result.leaderboard_path.exists()
     assert result.distribution_path.exists()
+    assert result.diagnosis_path.exists()
     assert result.recommendations_path.exists()
     assert result.report_path.exists()
 
@@ -86,3 +87,8 @@ automation:
         distribution.columns
     )
     assert set(distribution["split"]) == {"train", "validation", "test"}
+
+    diagnosis = pd.read_csv(result.diagnosis_path)
+    assert {"stage", "status", "reason"}.issubset(diagnosis.columns)
+    assert {"lgbm", "lstm"}.issubset(set(diagnosis["stage"]))
+    assert (result.run_dir / "experiment_diagnosis.md").exists()
