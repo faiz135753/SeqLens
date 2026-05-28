@@ -10,6 +10,7 @@ from seqlens.automation.external_signals import (
     ExternalSignalRecommendation,
     recommend_external_signals,
 )
+from seqlens.automation.station_metrics import station_level_metrics
 from seqlens.automation.planner import (
     ExperimentDiagnosis,
     PromotionDecision,
@@ -30,4 +31,5 @@ __all__ = [
     "recommend_external_signals",
     "recommend_event_factors",
     "run_auto_event_experiment",
+    "station_level_metrics",
 ]

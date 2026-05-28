@@ -27,6 +27,10 @@ from seqlens.automation.external_signals import (
     external_signal_recommendations_to_markdown,
     recommend_external_signals,
 )
+from seqlens.automation.station_metrics import (
+    station_level_metrics,
+    station_level_metrics_markdown,
+)
 from seqlens.data.splitting import time_based_split
 from seqlens.experiments import (
     EventExperimentConfig,
@@ -50,6 +54,7 @@ class AutoExperimentResult:
     diagnosis_path: Path
     factor_recommendations_path: Path
     external_signal_recommendations_path: Path
+    station_level_metrics_path: Path
     recommendations_path: Path
     report_path: Path
     candidate_count: int
@@ -65,6 +70,7 @@ class AutoExperimentResult:
             f"Experiment diagnosis: {self.diagnosis_path}\n"
             f"Factor recommendations: {self.factor_recommendations_path}\n"
             f"External signal recommendations: {self.external_signal_recommendations_path}\n"
+            f"Station-level metrics: {self.station_level_metrics_path}\n"
             f"Recommendations: {self.recommendations_path}\n"
             f"Final report: {self.report_path}"
         )
@@ -198,6 +204,11 @@ def run_auto_event_experiment(
                         )
 
     leaderboard = pd.DataFrame(rows)
+    if not leaderboard.empty:
+        leaderboard = _add_constrained_scores(
+            leaderboard,
+            false_alarm_cap=base_config.false_alarm_cap,
+        )
     leaderboard_path = run_dir / "leaderboard.csv"
     leaderboard.to_csv(leaderboard_path, index=False)
 
@@ -209,6 +220,14 @@ def run_auto_event_experiment(
     diagnosis_to_frame(diagnosis).to_csv(diagnosis_path, index=False)
     diagnosis_md_path = run_dir / "experiment_diagnosis.md"
     diagnosis_md_path.write_text(diagnosis_to_markdown(diagnosis), encoding="utf-8")
+    station_metrics = station_level_metrics(leaderboard)
+    station_level_metrics_path = run_dir / "station_level_metrics.csv"
+    station_metrics.to_csv(station_level_metrics_path, index=False)
+    station_metrics_markdown = station_level_metrics_markdown(station_metrics)
+    (run_dir / "station_level_metrics.md").write_text(
+        station_metrics_markdown,
+        encoding="utf-8",
+    )
     external_signal_recommendations = recommend_external_signals(
         leaderboard,
         imbalance,
@@ -242,6 +261,7 @@ def run_auto_event_experiment(
             diagnosis_markdown=diagnosis_to_markdown(diagnosis),
             factor_recommendations_markdown=factor_recommendations_md,
             external_signal_recommendations_markdown=external_signal_recommendations_markdown,
+            station_metrics_markdown=station_metrics_markdown,
             errors=errors,
             recommendations=recommendations,
         ),
@@ -257,6 +277,7 @@ def run_auto_event_experiment(
         diagnosis_path=diagnosis_path,
         factor_recommendations_path=factor_recommendations_path,
         external_signal_recommendations_path=external_signal_recommendations_path,
+        station_level_metrics_path=station_level_metrics_path,
         recommendations_path=recommendations_path,
         report_path=report_path,
         candidate_count=len(rows) + len(errors),
@@ -321,6 +342,60 @@ def _leaderboard_row(
         "test_miss_rate": result.test_metrics.miss_rate,
         "test_positive_support": result.test_metrics.positive_support,
     }
+
+
+def _add_constrained_scores(
+    leaderboard: pd.DataFrame,
+    *,
+    false_alarm_cap: float,
+) -> pd.DataFrame:
+    result = leaderboard.copy()
+    result["validation_recall_under_false_alarm_cap"] = result.apply(
+        lambda row: _constrained_recall(
+            recall=float(row["validation_recall"]),
+            false_alarm_rate=float(row["validation_false_alarm_rate"]),
+            false_alarm_cap=false_alarm_cap,
+        ),
+        axis=1,
+    )
+    result["test_recall_under_false_alarm_cap"] = result.apply(
+        lambda row: _constrained_recall(
+            recall=float(row["test_recall"]),
+            false_alarm_rate=float(row["test_false_alarm_rate"]),
+            false_alarm_cap=false_alarm_cap,
+        ),
+        axis=1,
+    )
+    result["test_operational_score"] = result.apply(
+        lambda row: _operational_score(
+            recall=float(row["test_recall"]),
+            false_alarm_rate=float(row["test_false_alarm_rate"]),
+            false_alarm_cap=false_alarm_cap,
+        ),
+        axis=1,
+    )
+    return result
+
+
+def _constrained_recall(
+    *,
+    recall: float,
+    false_alarm_rate: float,
+    false_alarm_cap: float,
+) -> float:
+    if false_alarm_rate > false_alarm_cap:
+        return 0.0
+    return recall
+
+
+def _operational_score(
+    *,
+    recall: float,
+    false_alarm_rate: float,
+    false_alarm_cap: float,
+) -> float:
+    penalty = max(0.0, false_alarm_rate - false_alarm_cap)
+    return recall - (10 * penalty)
 
 
 def _event_distribution_report(
@@ -531,6 +606,7 @@ def _final_report(
     diagnosis_markdown: str,
     factor_recommendations_markdown: str,
     external_signal_recommendations_markdown: str,
+    station_metrics_markdown: str,
     errors: list[dict],
     recommendations: str,
 ) -> str:
@@ -570,6 +646,10 @@ def _final_report(
 ## External Signal Recommendations
 
 {external_signal_recommendations_markdown}
+
+## Station-Level Metrics
+
+{station_metrics_markdown}
 
 ## Failed Candidates
 

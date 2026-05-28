@@ -77,6 +77,7 @@ automation:
     assert result.diagnosis_path.exists()
     assert result.factor_recommendations_path.exists()
     assert result.external_signal_recommendations_path.exists()
+    assert result.station_level_metrics_path.exists()
     assert result.recommendations_path.exists()
     assert result.report_path.exists()
 
@@ -86,6 +87,8 @@ automation:
         leaderboard.columns
     )
     assert "threshold_strategy" in leaderboard.columns
+    assert "test_recall_under_false_alarm_cap" in leaderboard.columns
+    assert "test_operational_score" in leaderboard.columns
 
     distribution = pd.read_csv(result.distribution_path)
     assert {"split", "entity", "positive_support", "event_rate"}.issubset(
@@ -116,3 +119,9 @@ automation:
     assert "rainfall" in set(factor_recommendations["column"])
     assert (result.run_dir / "factor_recommendations.md").exists()
     assert (result.run_dir / "external_signal_recommendations.md").exists()
+
+    station_metrics = pd.read_csv(result.station_level_metrics_path)
+    assert {"entity", "recall", "false_alarm_rate", "positive_support"}.issubset(
+        station_metrics.columns
+    )
+    assert (result.run_dir / "station_level_metrics.md").exists()

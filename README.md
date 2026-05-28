@@ -143,6 +143,8 @@ factor_recommendations.csv
 factor_recommendations.md
 external_signal_recommendations.csv
 external_signal_recommendations.md
+station_level_metrics.csv
+station_level_metrics.md
 leaderboard.csv
 recommendations.md
 final_report.md
@@ -151,7 +153,7 @@ final_report.md
 For rainfall warning experiments, the current automation path is:
 
 ```text
-event support scan -> imbalance diagnosis -> event_majority -> recent_window_threshold -> lgbm -> external signal recommendations -> experiment diagnosis -> recommendations
+event support scan -> imbalance diagnosis -> event_majority -> recent_window_threshold -> lgbm -> constrained score -> station-level metrics -> external signal recommendations -> experiment diagnosis -> recommendations
 ```
 
 The event support plan scans threshold and horizon combinations before model
@@ -160,6 +162,9 @@ promotion. It labels event definitions as `stable`, `usable`, `sparse`, or
 The imbalance diagnosis classifies each event definition as `normal`,
 `imbalanced`, `rare`, `extreme`, or `unusable`, then recommends the safest next
 experiment strategy.
+The leaderboard includes recall under a false-alarm cap and an operational score,
+while station-level metrics check whether aggregate performance is hiding weak
+entities.
 
 `recent_window_threshold` is a generic event-aware baseline. It compares a rolling
 factor, such as a recent sum, max, mean, or volatility proxy, against a threshold.

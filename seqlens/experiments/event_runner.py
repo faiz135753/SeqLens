@@ -430,6 +430,7 @@ def _write_event_artifacts(
         validation_frame,
         validation_predictions,
         target_col,
+        entity_col=config.entity_col,
         probabilities=validation_probabilities,
     ).to_csv(
         run_dir / "validation_predictions.csv",
@@ -439,6 +440,7 @@ def _write_event_artifacts(
         test_frame,
         test_predictions,
         target_col,
+        entity_col=config.entity_col,
         probabilities=test_probabilities,
     ).to_csv(
         run_dir / "test_predictions.csv",
@@ -461,6 +463,7 @@ def _event_predictions(
     predictions: pd.Series,
     target_col: str,
     *,
+    entity_col: str | None = None,
     probabilities: pd.Series | None = None,
 ) -> pd.DataFrame:
     result = pd.DataFrame(
@@ -470,6 +473,8 @@ def _event_predictions(
             "predicted": predictions.reset_index(drop=True).astype(int),
         }
     )
+    if entity_col and entity_col in frame.columns:
+        result["entity"] = frame[entity_col].reset_index(drop=True)
     if probabilities is not None:
         result["probability"] = probabilities.reset_index(drop=True)
     return result
