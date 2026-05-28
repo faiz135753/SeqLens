@@ -128,6 +128,13 @@ Run an automated event experiment:
 seqlens auto-run configs/rainfall_extreme_rain.yaml
 ```
 
+Run the Bike Sharing positive benchmark:
+
+```bash
+python scripts/prepare_bike_sharing_sample.py
+seqlens auto-run configs/bike_sharing_high_demand.yaml
+```
+
 `auto-run` expands configured thresholds, observation windows, and models, then writes:
 
 ```text
@@ -194,6 +201,12 @@ The first external rainfall test notes are in:
 
 ```text
 docs/rainfall_event_testing.md
+```
+
+The Bike Sharing positive benchmark notes are in:
+
+```text
+docs/bike_sharing_benchmark.md
 ```
 
 ## Factor Builder Example

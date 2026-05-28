@@ -1,0 +1,65 @@
+domain: bike_sharing
+task_type: classification
+
+data:
+  path: data/bike_sharing_hourly.csv
+  time_col: datetime
+  frequency: hourly
+
+target:
+  type: future_window_event
+  column: demand
+  horizon: 1
+  aggregation: value
+  threshold: 400
+  name: high_demand_next_1h
+
+window:
+  observation_windows: [24, 48]
+  horizons: [1, 3, 6]
+  step: 1
+
+factors:
+  lag:
+    columns: [demand, casual, registered, temp, atemp, hum, windspeed, weathersit, workingday, holiday]
+    periods: [1, 2, 3, 6, 12, 24]
+  rolling:
+    columns: [demand, casual, registered, temp, hum, windspeed]
+    windows: [3, 6, 12, 24]
+    stats: [mean, max, min, std, slope]
+  diff:
+    columns: [demand, temp, hum, windspeed]
+    periods: [1, 3, 6, 24]
+  ratio_to_rolling_mean:
+    columns: [demand]
+    windows: [6, 12, 24]
+  calendar: [hour, day_of_week, month, season]
+
+models:
+  baselines: [event_majority, recent_window_threshold]
+  tabular: [lgbm]
+
+event_baseline:
+  type: recent_window_threshold
+  column: demand
+  window: 3
+  aggregation: max
+  threshold: 400
+
+evaluation:
+  primary_metric: f1
+  secondary_metrics: [precision, recall]
+  threshold_strategy:
+    name: maximize_f1
+    precision_floor: 0.30
+    false_alarm_cap: 0.10
+
+automation:
+  thresholds: [300, 400, 500]
+  horizons: [1, 3, 6]
+  observation_windows: [24, 48]
+  models: [event_majority, recent_window_threshold, lgbm]
+  threshold_strategies:
+    - maximize_f1
+    - maximize_recall_with_precision_floor
+    - minimize_miss_rate_with_false_alarm_cap
