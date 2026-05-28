@@ -141,6 +141,8 @@ experiment_diagnosis.csv
 experiment_diagnosis.md
 factor_recommendations.csv
 factor_recommendations.md
+external_signal_recommendations.csv
+external_signal_recommendations.md
 leaderboard.csv
 recommendations.md
 final_report.md
@@ -149,7 +151,7 @@ final_report.md
 For rainfall warning experiments, the current automation path is:
 
 ```text
-event support scan -> imbalance diagnosis -> event_majority -> recent_window_threshold -> lgbm -> experiment diagnosis -> recommendations
+event support scan -> imbalance diagnosis -> event_majority -> recent_window_threshold -> lgbm -> external signal recommendations -> experiment diagnosis -> recommendations
 ```
 
 The event support plan scans threshold and horizon combinations before model
@@ -170,6 +172,9 @@ The experiment diagnosis artifact records whether the next modeling stage is
 The factor recommendation artifact suggests generic next-round feature recipes
 from available numeric columns, which is the bridge toward planner-driven config
 generation.
+The external signal recommendation artifact is triggered when internal factors
+appear insufficient, such as when a simple event-aware baseline outperforms LGBM
+or LGBM needs a high false-alarm rate to recover events.
 
 Supported threshold strategies for probability models:
 

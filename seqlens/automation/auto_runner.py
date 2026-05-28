@@ -22,6 +22,11 @@ from seqlens.automation.imbalance import (
     imbalance_diagnosis,
     imbalance_diagnosis_markdown,
 )
+from seqlens.automation.external_signals import (
+    external_signal_recommendations_to_frame,
+    external_signal_recommendations_to_markdown,
+    recommend_external_signals,
+)
 from seqlens.data.splitting import time_based_split
 from seqlens.experiments import (
     EventExperimentConfig,
@@ -44,6 +49,7 @@ class AutoExperimentResult:
     imbalance_diagnosis_path: Path
     diagnosis_path: Path
     factor_recommendations_path: Path
+    external_signal_recommendations_path: Path
     recommendations_path: Path
     report_path: Path
     candidate_count: int
@@ -58,6 +64,7 @@ class AutoExperimentResult:
             f"Imbalance diagnosis: {self.imbalance_diagnosis_path}\n"
             f"Experiment diagnosis: {self.diagnosis_path}\n"
             f"Factor recommendations: {self.factor_recommendations_path}\n"
+            f"External signal recommendations: {self.external_signal_recommendations_path}\n"
             f"Recommendations: {self.recommendations_path}\n"
             f"Final report: {self.report_path}"
         )
@@ -202,6 +209,24 @@ def run_auto_event_experiment(
     diagnosis_to_frame(diagnosis).to_csv(diagnosis_path, index=False)
     diagnosis_md_path = run_dir / "experiment_diagnosis.md"
     diagnosis_md_path.write_text(diagnosis_to_markdown(diagnosis), encoding="utf-8")
+    external_signal_recommendations = recommend_external_signals(
+        leaderboard,
+        imbalance,
+        domain=str(raw.get("domain", "generic")),
+        false_alarm_cap=base_config.false_alarm_cap,
+    )
+    external_signal_recommendations_path = run_dir / "external_signal_recommendations.csv"
+    external_signal_recommendations_to_frame(external_signal_recommendations).to_csv(
+        external_signal_recommendations_path,
+        index=False,
+    )
+    external_signal_recommendations_markdown = external_signal_recommendations_to_markdown(
+        external_signal_recommendations
+    )
+    (run_dir / "external_signal_recommendations.md").write_text(
+        external_signal_recommendations_markdown,
+        encoding="utf-8",
+    )
 
     recommendations = _recommendations(leaderboard, errors, distribution, diagnosis)
     recommendations_path = run_dir / "recommendations.md"
@@ -216,6 +241,7 @@ def run_auto_event_experiment(
             imbalance_markdown=imbalance_markdown,
             diagnosis_markdown=diagnosis_to_markdown(diagnosis),
             factor_recommendations_markdown=factor_recommendations_md,
+            external_signal_recommendations_markdown=external_signal_recommendations_markdown,
             errors=errors,
             recommendations=recommendations,
         ),
@@ -230,6 +256,7 @@ def run_auto_event_experiment(
         imbalance_diagnosis_path=imbalance_diagnosis_path,
         diagnosis_path=diagnosis_path,
         factor_recommendations_path=factor_recommendations_path,
+        external_signal_recommendations_path=external_signal_recommendations_path,
         recommendations_path=recommendations_path,
         report_path=report_path,
         candidate_count=len(rows) + len(errors),
@@ -503,6 +530,7 @@ def _final_report(
     imbalance_markdown: str,
     diagnosis_markdown: str,
     factor_recommendations_markdown: str,
+    external_signal_recommendations_markdown: str,
     errors: list[dict],
     recommendations: str,
 ) -> str:
@@ -538,6 +566,10 @@ def _final_report(
 ## Factor Recommendations
 
 {factor_recommendations_markdown}
+
+## External Signal Recommendations
+
+{external_signal_recommendations_markdown}
 
 ## Failed Candidates
 

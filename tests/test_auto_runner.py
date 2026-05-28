@@ -76,6 +76,7 @@ automation:
     assert result.imbalance_diagnosis_path.exists()
     assert result.diagnosis_path.exists()
     assert result.factor_recommendations_path.exists()
+    assert result.external_signal_recommendations_path.exists()
     assert result.recommendations_path.exists()
     assert result.report_path.exists()
 
@@ -114,3 +115,4 @@ automation:
     )
     assert "rainfall" in set(factor_recommendations["column"])
     assert (result.run_dir / "factor_recommendations.md").exists()
+    assert (result.run_dir / "external_signal_recommendations.md").exists()
