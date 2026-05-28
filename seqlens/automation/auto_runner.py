@@ -18,6 +18,10 @@ from seqlens.automation.factor_planner import (
     recommend_event_factors,
 )
 from seqlens.automation.event_support import event_support_markdown, event_support_plan
+from seqlens.automation.imbalance import (
+    imbalance_diagnosis,
+    imbalance_diagnosis_markdown,
+)
 from seqlens.data.splitting import time_based_split
 from seqlens.experiments import (
     EventExperimentConfig,
@@ -37,6 +41,7 @@ class AutoExperimentResult:
     leaderboard_path: Path
     distribution_path: Path
     support_plan_path: Path
+    imbalance_diagnosis_path: Path
     diagnosis_path: Path
     factor_recommendations_path: Path
     recommendations_path: Path
@@ -50,6 +55,7 @@ class AutoExperimentResult:
             f"Leaderboard: {self.leaderboard_path}\n"
             f"Event distribution: {self.distribution_path}\n"
             f"Event support plan: {self.support_plan_path}\n"
+            f"Imbalance diagnosis: {self.imbalance_diagnosis_path}\n"
             f"Experiment diagnosis: {self.diagnosis_path}\n"
             f"Factor recommendations: {self.factor_recommendations_path}\n"
             f"Recommendations: {self.recommendations_path}\n"
@@ -114,6 +120,14 @@ def run_auto_event_experiment(
     support_plan_markdown = event_support_markdown(support_plan)
     (run_dir / "event_support_plan.md").write_text(
         support_plan_markdown,
+        encoding="utf-8",
+    )
+    imbalance = imbalance_diagnosis(support_plan)
+    imbalance_diagnosis_path = run_dir / "imbalance_diagnosis.csv"
+    imbalance.to_csv(imbalance_diagnosis_path, index=False)
+    imbalance_markdown = imbalance_diagnosis_markdown(imbalance)
+    (run_dir / "imbalance_diagnosis.md").write_text(
+        imbalance_markdown,
         encoding="utf-8",
     )
     factor_recommendations = recommend_event_factors(frame, base_config)
@@ -199,6 +213,7 @@ def run_auto_event_experiment(
             leaderboard=leaderboard,
             distribution=distribution,
             support_plan_markdown=support_plan_markdown,
+            imbalance_markdown=imbalance_markdown,
             diagnosis_markdown=diagnosis_to_markdown(diagnosis),
             factor_recommendations_markdown=factor_recommendations_md,
             errors=errors,
@@ -212,6 +227,7 @@ def run_auto_event_experiment(
         leaderboard_path=leaderboard_path,
         distribution_path=distribution_path,
         support_plan_path=support_plan_path,
+        imbalance_diagnosis_path=imbalance_diagnosis_path,
         diagnosis_path=diagnosis_path,
         factor_recommendations_path=factor_recommendations_path,
         recommendations_path=recommendations_path,
@@ -484,6 +500,7 @@ def _final_report(
     leaderboard: pd.DataFrame,
     distribution: pd.DataFrame,
     support_plan_markdown: str,
+    imbalance_markdown: str,
     diagnosis_markdown: str,
     factor_recommendations_markdown: str,
     errors: list[dict],
@@ -509,6 +526,10 @@ def _final_report(
 ## Event Support Plan
 
 {support_plan_markdown}
+
+## Imbalance Diagnosis
+
+{imbalance_markdown}
 
 ## Experiment Diagnosis
 

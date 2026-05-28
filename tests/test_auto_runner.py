@@ -73,6 +73,7 @@ automation:
     assert result.leaderboard_path.exists()
     assert result.distribution_path.exists()
     assert result.support_plan_path.exists()
+    assert result.imbalance_diagnosis_path.exists()
     assert result.diagnosis_path.exists()
     assert result.factor_recommendations_path.exists()
     assert result.recommendations_path.exists()
@@ -95,6 +96,12 @@ automation:
     assert {"threshold", "horizon", "support_status"}.issubset(support_plan.columns)
     assert set(support_plan["horizon"]) == {3, 6}
     assert (result.run_dir / "event_support_plan.md").exists()
+
+    imbalance = pd.read_csv(result.imbalance_diagnosis_path)
+    assert {"threshold", "horizon", "severity", "recommended_strategy"}.issubset(
+        imbalance.columns
+    )
+    assert (result.run_dir / "imbalance_diagnosis.md").exists()
 
     diagnosis = pd.read_csv(result.diagnosis_path)
     assert {"stage", "status", "reason"}.issubset(diagnosis.columns)

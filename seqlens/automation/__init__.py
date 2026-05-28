@@ -5,6 +5,7 @@ from seqlens.automation.factor_planner import (
     recommend_event_factors,
 )
 from seqlens.automation.event_support import event_support_plan
+from seqlens.automation.imbalance import imbalance_diagnosis
 from seqlens.automation.planner import (
     ExperimentDiagnosis,
     PromotionDecision,
@@ -20,6 +21,7 @@ __all__ = [
     "diagnose_auto_experiment",
     "event_support_plan",
     "generate_candidates",
+    "imbalance_diagnosis",
     "recommend_event_factors",
     "run_auto_event_experiment",
 ]
